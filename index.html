@@ -301,13 +301,11 @@ function renderDisplay(){
     tiles+='<div class="tile '+cls+'"><div class="lamp" aria-hidden="true"></div><div class="who">'+esc(n)+'</div><div class="st">'+esc(txt)+'</div>'+
       (chips.length?'<div class="chips">'+chips.map(function(c){return '<span class="chip">'+esc(c)+'</span>'}).join('')+'</div>':'')+'</div>';
   });
-  if(nt)h+='<div class="team n'+nt+'">'+tiles+'</div>';
 
   h+=weekTable(cfg,sl,now);
   h+='<div class="legend"><span><span class="dot" style="color:var(--go)"></span>Vert : aller voir cette personne</span>'+
      '<span><span class="dot" style="color:var(--go);opacity:.4"></span>Vert pâle : 2e choix, si la première n\'est pas disponible</span>'+
-     '<span><span class="dot" style="color:var(--stop)"></span>Rouge : téléphonie ou ne pas déranger</span>'+
-     '<span><span class="dot" style="color:var(--off)"></span>Gris : en congé</span></div>';
+     '</div>';
   el.innerHTML=h;
 }
 function timeOf(iso){var d=new Date(iso);return hfmt(pad(d.getHours())+':'+pad(d.getMinutes()))}
