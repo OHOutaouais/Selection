@@ -138,6 +138,17 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
 .tcell{display:grid;grid-gap:6px;align-content:start}
 .tbtn{padding:12px 14px;font-size:1.1rem;font-weight:700}
 .tbtn.on{background:var(--stop);color:var(--stop-ink);border-color:var(--stop)}
+.mine{display:grid;grid-template-columns:auto 1fr;grid-gap:12px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px}
+.mine b{font-family:var(--f-display);font-size:1.6rem;font-weight:600}
+.mine .meta{color:var(--muted)}
+.mine.busy{border-color:var(--stop)}
+.lamp.gofree{background:var(--go);box-shadow:0 0 10px var(--go)}
+.mine .lamp{width:30px;height:30px}
+.item .lamp,.mine .lamp{grid-row:auto}
+.bigbtns{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));grid-gap:10px;margin-top:12px}
+.btn.big{padding:16px;font-size:1.15rem;font-weight:700}
+.btn.stopb{background:var(--stop);color:var(--stop-ink);border-color:var(--stop)}
+.btn.freeb{background:var(--go);color:var(--go-ink);border-color:var(--go)}
 .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));grid-gap:8px;margin-top:20px;color:var(--muted);font-size:.88rem}
 .legend span .dot{width:.9em;height:.9em}
 
@@ -164,6 +175,7 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
     <div class="clock" id="clock">--:--</div>
     <nav class="nav" aria-label="Vues">
       <a href="#affichage" id="nav-affichage">Affichage</a>
+      <a href="#statut" id="nav-statut" hidden>Mon statut</a>
       <a href="#config" id="nav-config">Configuration</a>
     </nav>
   </header>
@@ -172,6 +184,7 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
     <div class="empty"><h2>Chargement de l'horaire…</h2><p>Un instant.</p></div>
   </main>
 
+  <main id="view-statut" hidden></main>
   <main id="view-config" hidden></main>
 </div>
 
@@ -181,6 +194,7 @@ var DAYS=[{k:'lun',l:'Lundi'},{k:'mar',l:'Mardi'},{k:'mer',l:'Mercredi'},{k:'jeu
 var WD=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
 var MO=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 var STANDALONE=true;
+var FB_URL='https://selection-horaire-default-rtdb.firebaseio.com/';
 var S={edit:null,state:'loading',cfg:null,db:null,ref:null,canWrite:true,draft:null,dirty:false,msg:'',msgErr:false,pendingCfg:false,armed:null};
 
 function $(s){return document.querySelector(s)}
@@ -220,8 +234,11 @@ function tempState(){
 function tempAway(){return tempState().away}
 function saveTemp(v){v.date=ymd(new Date());try{localStorage.setItem('horaire-temp',JSON.stringify(v))}catch(e){}}
 function withTemp(cfg){
-  var ts=STANDALONE?tempState():{away:[],subs:{}};if(!ts.away.length)return cfg;
-  var c=clone(cfg),t=ymd(new Date());
+  var c=cfg,nowMs=Date.now();
+  if(STANDALONE&&S.live){c=clone(cfg);Object.keys(S.live).forEach(function(n){var v=S.live[n];
+    if(v&&v.until>nowMs)c.status[n]={dnd:true,until:new Date(v.until).toISOString(),note:v.note||''};});}
+  var ts=STANDALONE?tempState():{away:[],subs:{}};if(!ts.away.length)return c;
+  c=clone(c);var t=ymd(new Date());
   ts.away.forEach(function(n){c.absences.unshift({id:'tmp-'+n,name:n,from:t,to:t,part:'jour',note:'',sub:ts.subs[n]||''})});
   return c;
 }
@@ -263,7 +280,7 @@ function resolve(cfg,date,p,now,live){
     var st=r.people[n]||{};
     if(st.abs&&st.abs.sub)r.avail.push({name:st.abs.sub,rank:i,sub:n});
     else if(st.abs)r.skipped.push({name:n,rank:i,why:'en congé'});
-    else if(st.dnd)r.skipped.push({name:n,rank:i,why:'ne pas déranger'});
+    else if(st.dnd)r.skipped.push({name:n,rank:i,why:(st.dnd.note||'Ne pas déranger').toLowerCase()+(st.dnd.until?' jusqu\'à '+timeOf(st.dnd.until):'')});
     else r.avail.push({name:n,rank:i});
   });
   var seen={};r.avail=r.avail.filter(function(x){if(seen[x.name])return false;seen[x.name]=1;return true;});
@@ -332,6 +349,7 @@ function renderDisplay(){
   h+='<div class="legend"><span><span class="dot" style="color:var(--go)"></span>Vert : aller voir cette personne</span>'+
      '<span><span class="dot" style="color:var(--go);opacity:.4"></span>Vert pâle : 2e choix, si la première n\'est pas disponible</span>'+
      '</div>';
+  if(STANDALONE&&FB_URL&&(!teamCode()||S.liveErr===401))h+='<p class="s2" style="margin-top:16px">Statuts en direct inactifs sur cet appareil. Ouvrez « Mon statut » pour entrer le code d\'équipe.</p>';
   if(STANDALONE){
     var away=tempAway();
     h+='<section class="temp"><h3>Absent aujourd\'hui</h3><p>Touchez un nom pour le retirer de l\'horaire d\'aujourd\'hui, et inscrivez au besoin qui le remplace. Ce changement reste <b>sur cet appareil seulement</b> et s\'efface à minuit.</p><div class="tempbtns">';
@@ -394,6 +412,7 @@ function renderConfig(){
 
   // statut immédiat
   var now=new Date();
+  if(!STANDALONE){
   h+='<section class="card"><h2>Statut immédiat</h2><p class="hint">Pour une rencontre, une formation ou un dossier urgent. La personne passe au rouge et l\'accueil va voir la suivante.</p><div class="people">';
   cfg.team.forEach(function(n,i){
     var s=dndFor(cfg,n,now);
@@ -404,6 +423,7 @@ function renderConfig(){
     h+='</div>';
   });
   h+='</div></section>';
+  }
 
   // message
   h+='<section class="card"><h2>Message à l\'écran</h2><p class="hint">S\'affiche en haut de l\'affichage. Laisser vide pour l\'enlever.</p><div class="savebar"><input id="notice" value="'+esc(cfg.notice)+'" placeholder="Ex. : Équipe en réunion jusqu\'à 10 h"'+dis+'><button class="btn primary" data-act="notice"'+dis+'>Afficher</button></div></section>';
@@ -512,6 +532,26 @@ document.addEventListener('click',function(ev){
       }});
       c.team=D.team.filter(Boolean);c.hours=D.hours;c.phones=D.phones;c.accueil=D.accueil;
     },'Horaire enregistré.');
+  }else if(act==='setcode'){
+    var cv=$('#st-code').value.trim();if(!cv)return;
+    try{localStorage.setItem('horaire-code',cv)}catch(e){}S.liveErr=null;renderStatut();pollLive();
+  }else if(act==='st'||act==='stfree'){
+    var me=getMe();if(!me)return;
+    var body=null,method='DELETE';
+    if(act==='st'){
+      var dv=$('#st-dur').value,nw=new Date(),u;
+      if(dv==='day'){var em=mins(S.cfg.hours.end);u=new Date(nw.getFullYear(),nw.getMonth(),nw.getDate(),Math.floor(em/60),em%60).getTime();}
+      else u=nw.getTime()+(+dv)*60000;
+      body={until:u,note:b.getAttribute('data-kind')==='rdv'?'En rendez-vous':'Ne pas déranger'};method='PUT';
+    }
+    b.disabled=true;stMsg('Envoi…');
+    fbReq(method,'statuts/'+encodeURIComponent(me),body,function(err){
+      if(err===401){S.liveErr=401;renderStatut();return;}
+      if(err){b.disabled=false;stMsg('Pas envoyé : vérifiez la connexion internet et réessayez.',true);return;}
+      S.live=S.live||{};if(body)S.live[me]=body;else delete S.live[me];
+      renderStatut();stMsg(body?'Envoyé. L\'accueil vous voit comme « '+body.note+' ».':'Envoyé. Vous êtes de nouveau disponible.');
+      pollLive();
+    });
   }else if(act==='tmp'){
     var tn=S.cfg.team[+b.getAttribute('data-n')],ts=tempState(),ix=ts.away.indexOf(tn);
     if(ix>=0){ts.away.splice(ix,1);delete ts.subs[tn];}else ts.away.push(tn);
@@ -526,6 +566,7 @@ document.addEventListener('click',function(ev){
 });
 document.addEventListener('change',function(ev){
   var t=ev.target;
+  if(t.hasAttribute&&t.hasAttribute('data-me')){try{localStorage.setItem('horaire-me',t.value)}catch(e){}t.blur();renderStatut();return;}
   if(t.hasAttribute&&t.hasAttribute('data-tsub')){var ts=tempState(),nn=S.cfg.team[+t.getAttribute('data-tsub')],v=t.value.trim();
     if(v)ts.subs[nn]=v;else delete ts.subs[nn];saveTemp(ts);renderDisplay();return;}
   var D=S.draft;if(!D)return;
@@ -568,21 +609,78 @@ function loadJson(){
   x.onload=function(){
     if(x.status>=200&&x.status<300){try{S.cfg=normalize(JSON.parse(x.responseText));S.state='ok';}catch(e){if(!S.cfg)useSeed();}}
     else if(!S.cfg)useSeed();
-    if(view()==='affichage')renderDisplay();else renderConfig();
+    refreshView();
   };
-  x.onerror=function(){if(!S.cfg)useSeed();if(view()==='affichage')renderDisplay();else renderConfig();};
+  x.onerror=function(){if(!S.cfg)useSeed();refreshView();};
   x.send();
 }
 function useSeed(){var el=document.getElementById('seed');if(el){try{S.cfg=normalize(JSON.parse(el.textContent));S.state='ok';return;}catch(e){}}S.state='err';}
 
+/* ---------- statuts en direct (Firebase) ---------- */
+function teamCode(){
+  var m=location.search.match(/[?&]code=([A-Za-z0-9_-]+)/);
+  if(m){try{localStorage.setItem('horaire-code',m[1])}catch(e){}return m[1];}
+  try{return localStorage.getItem('horaire-code')||''}catch(e){return ''}
+}
+function getMe(){try{return localStorage.getItem('horaire-me')||''}catch(e){return ''}}
+function fbReq(method,path,body,cb){
+  var x=new XMLHttpRequest();
+  x.open(method,FB_URL+'e/'+teamCode()+'/'+path+'.json');
+  x.setRequestHeader('Content-Type','application/json');
+  x.onload=function(){cb(x.status>=200&&x.status<300?null:x.status,x.responseText)};
+  x.onerror=function(){cb('net')};
+  x.send(body?JSON.stringify(body):null);
+}
+function pollLive(){
+  if(!FB_URL||!teamCode())return;
+  fbReq('GET','statuts',null,function(err,t){
+    if(!err){try{S.live=JSON.parse(t)||{};S.liveErr=null}catch(e){}}else S.liveErr=err;
+    var ae=document.activeElement;if(!(ae&&/INPUT|SELECT/.test(ae.tagName)))refreshView();
+  });
+}
+function durOpts(){return '<option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>1 heure</option><option value="90">1 h 30</option><option value="120">2 heures</option><option value="day">Jusqu\'à la fin de la journée</option>'}
+function renderStatut(){
+  var el=$('#view-statut');
+  if(!S.cfg){el.innerHTML='<div class="empty"><h2>Chargement…</h2></div>';return;}
+  if(!FB_URL){el.innerHTML='<div class="empty"><h2>Statuts pas encore configurés</h2><p>La connexion aux statuts en direct n\'est pas encore installée.</p></div>';return;}
+  var code=teamCode(),h='<div class="cfg">';
+  if(!code||S.liveErr===401){
+    h+='<section class="card"><h2>Code d\'équipe</h2><p class="hint">'+(S.liveErr===401?'Ce code ne fonctionne pas. Vérifiez-le et entrez-le de nouveau.':'Entrez le code d\'équipe une seule fois sur cet appareil. Il sera retenu.')+'</p>'+
+      '<div class="savebar"><input id="st-code" placeholder="sel-…" autocomplete="off" autocapitalize="off"><button class="btn primary" data-act="setcode">Enregistrer</button></div></section></div>';
+    el.innerHTML=h;return;
+  }
+  var me=getMe(),now=Date.now(),live=S.live||{};
+  h+='<section class="card"><h2>Mon statut</h2><p class="hint">Gardez cette page ouverte sur votre poste. L\'affichage de l\'accueil se met à jour en moins de 15 secondes.</p>'+
+    '<div class="row" style="margin-bottom:14px"><label class="f">Qui êtes-vous ?<select id="st-me" data-me="1">'+opts(S.cfg.team,me,'Choisir…')+'</select></label></div>';
+  if(me){
+    var v=live[me],on=v&&v.until>now;
+    h+='<div class="mine'+(on?' busy':'')+'"><span class="lamp'+(on?' stop':' gofree')+'"></span><div><b>'+esc(me)+'</b><div class="meta">'+
+      (on?esc(v.note)+' jusqu\'à '+timeOf(new Date(v.until).toISOString()):'Disponible, selon l\'horaire')+'</div></div></div>'+
+      '<div class="row" style="margin-top:14px"><label class="f">Durée<select id="st-dur">'+durOpts()+'</select></label></div>'+
+      '<div class="bigbtns"><button class="btn big stopb" data-act="st" data-kind="rdv">En rendez-vous</button>'+
+      '<button class="btn big stopb" data-act="st" data-kind="dnd">Ne pas déranger</button>'+
+      '<button class="btn big freeb" data-act="stfree"'+(on?'':' disabled')+'>Je suis disponible</button></div>';
+  }
+  h+='<div class="savebar"><span class="status" id="st-msg"></span><span></span></div></section>';
+  h+='<section class="card"><h2>L\'équipe en ce moment</h2><div class="list">';
+  S.cfg.team.forEach(function(n){var v=live[n],on=v&&v.until>now;
+    h+='<div class="item"><div><b>'+esc(n)+'</b> <span class="meta">'+(on?esc(v.note)+' jusqu\'à '+timeOf(new Date(v.until).toISOString()):'Selon l\'horaire')+'</span></div><span class="lamp'+(on?' stop':' gofree')+'" style="width:18px;height:18px"></span></div>';});
+  h+='</div></section></div>';
+  el.innerHTML=h;
+}
+function stMsg(m,err){var e=$('#st-msg');if(e){e.textContent=m;e.className='status'+(err?' err':'')}}
+
 /* ---------- vues ---------- */
-function view(){return location.hash==='#config'?'config':'affichage'}
+function view(){return location.hash==='#config'?'config':(location.hash==='#statut'&&STANDALONE)?'statut':'affichage'}
+function refreshView(){var v=view();if(v==='affichage')renderDisplay();else if(v==='statut')renderStatut();else renderConfig();}
 function render(){
   var v=view();
-  $('#view-display').hidden=v!=='affichage';$('#view-config').hidden=v!=='config';
+  $('#view-display').hidden=v!=='affichage';$('#view-config').hidden=v!=='config';$('#view-statut').hidden=v!=='statut';
+  $('#nav-statut').hidden=!STANDALONE;
   $('#nav-affichage').setAttribute('aria-current',v==='affichage'?'page':'false');
   $('#nav-config').setAttribute('aria-current',v==='config'?'page':'false');
-  if(v==='affichage')renderDisplay();else renderConfig();
+  $('#nav-statut').setAttribute('aria-current',v==='statut'?'page':'false');
+  refreshView();
 }
 function tick(){var d=new Date();$('#clock').textContent=d.getHours()+' h '+pad(d.getMinutes());}
 window.addEventListener('hashchange',function(){S.forceCfg=true;render()});
@@ -600,6 +698,7 @@ function waitClaude(ms){return new Promise(function(res){var t0=Date.now();(func
 if(STANDALONE){
   try{var ed=localStorage.getItem('horaire-edit');if(ed)S.edit=normalize(JSON.parse(ed));}catch(e){}
   loadJson();setInterval(loadJson,60000);
+  pollLive();setInterval(pollLive,15000);
 }else waitClaude(6000).then(function(cl){
   if(!cl){S.state='nodb';render();return null;}
   return cl.use('db').then(function(db){
@@ -611,7 +710,7 @@ if(STANDALONE){
     }).catch(function(){});
     S.ref.onSnapshot(function(s){
       S.state='ok';S.cfg=s.exists?normalize(s.data()):null;
-      if(view()==='affichage')renderDisplay();else renderConfig();
+      refreshView();
     },function(e){S.state='err';render();});
   });
 }).catch(function(){S.state='nodb';render();});
