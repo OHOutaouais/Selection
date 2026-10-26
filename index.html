@@ -266,6 +266,7 @@ function resolve(cfg,date,p,now,live){
     else if(st.dnd)r.skipped.push({name:n,rank:i,why:'ne pas déranger'});
     else r.avail.push({name:n,rank:i});
   });
+  var seen={};r.avail=r.avail.filter(function(x){if(seen[x.name])return false;seen[x.name]=1;return true;});
   return r;
 }
 
