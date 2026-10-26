@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<title>Horaire Sélection</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: tableau de signalisation — un gros voyant « qui aller voir », l'équipe en trois tuiles, la semaine en bas. Config sur un 2e onglet. */
+:root{
+  --bg:#0c1413; --panel:#131e1c; --panel-2:#192826; --line:#263634;
+  --fg:#eaf2ef; --muted:#93a8a2; --accent:#7fd1c3;
+  --go:#2fe07a; --go-ink:#06240f; --go-soft:rgba(47,224,122,.18); --go-line:rgba(47,224,122,.65); --wait:#ffc93a; --wait-ink:#2b1f00;
+  --stop:#ff5a52; --stop-ink:#2e0503; --off:#56635f;
+  --f-display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:16px;line-height:1.45;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 32px}
+.wrap{max-width:1280px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* barre */
+.bar{display:grid;grid-template-columns:1fr auto auto;align-items:center;grid-gap:16px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.brand{font-family:var(--f-display);font-size:1.35rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.brand small{display:block;font-family:var(--f-body);font-size:.8rem;letter-spacing:.04em;text-transform:none;color:var(--muted);font-weight:400}
+.clock{font-family:var(--f-display);font-size:2rem;font-weight:600;font-variant-numeric:tabular-nums}
+.nav{display:grid;grid-auto-flow:column;grid-gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
+.nav a{color:var(--muted);text-decoration:none;padding:6px 14px;border-radius:999px;font-size:.9rem}
+.nav a[aria-current="page"]{background:var(--panel-2);color:var(--fg)}
+
+.eyebrow{font-size:.78rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.ctx{display:grid;grid-template-columns:1fr auto;align-items:end;grid-gap:12px;margin-bottom:14px}
+.ctx h2{font-size:clamp(1.6rem,4vw,2.4rem)}
+.pill{display:inline-block;font-size:.8rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.live{color:var(--go);border-color:color-mix(in srgb,var(--go) 45%,transparent)}
+.notice{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:1.05rem}
+
+/* voyants principaux */
+.stage{display:grid;grid-template-columns:1.5fr 1fr;grid-gap:14px;margin-bottom:14px}
+.side{display:grid;grid-gap:14px;align-content:start}
+.sig{position:relative;border-radius:18px;padding:20px 24px;border:2px solid var(--line);background:var(--panel);overflow:hidden;min-width:0}
+.sig .lbl{font-size:.9rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+.sig .name{font-family:var(--f-display);font-weight:700;line-height:.95;margin-top:6px;overflow-wrap:anywhere}
+.sig .sub{margin-top:8px;font-size:1rem;opacity:.85}
+.sig.big .name{font-size:clamp(3.5rem,11vw,8.5rem)}
+.sig.small .name{font-size:clamp(2.4rem,6vw,4.2rem)}
+.sig.go{background:var(--go);color:var(--go-ink);border-color:var(--go);box-shadow:0 0 0 6px color-mix(in srgb,var(--go) 18%,transparent),0 0 60px color-mix(in srgb,var(--go) 45%,transparent)}
+.sig.wait{background:var(--go-soft);color:var(--fg);border-color:var(--go-line)}
+.sig.wait .lbl{color:var(--go)}
+.sig .phone{display:inline-block;margin-top:10px;font-size:.95rem;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.28);color:inherit}
+.sig.stop{background:var(--stop);color:var(--stop-ink);border-color:var(--stop)}
+.sig.none{color:var(--muted)}
+.sig.go::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;border-radius:16px;box-shadow:inset 0 0 0 4px rgba(255,255,255,.55);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:0}50%{opacity:1}}
+.dot{display:inline-block;width:.8em;height:.8em;border-radius:50%;background:currentColor;margin-right:.4em;vertical-align:-.05em}
+
+.later{border:1px solid var(--line);border-radius:14px;padding:14px 18px;background:var(--panel)}
+.later h3{font-size:1.2rem;margin:4px 0 6px}
+.later p{margin:0;color:var(--muted)}
+.later b{color:var(--fg)}
+
+/* équipe */
+.team{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-gap:14px;margin-bottom:22px}
+.tile{border-radius:14px;padding:14px 16px;background:var(--panel);border:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;grid-gap:4px 14px;align-items:center;min-width:0}
+.lamp{width:46px;height:46px;border-radius:50%;grid-row:span 2;background:var(--off);box-shadow:inset 0 -4px 8px rgba(0,0,0,.35)}
+.tile .who{font-family:var(--f-display);font-size:1.9rem;font-weight:600;line-height:1}
+.tile .st{font-size:.95rem;color:var(--muted)}
+.tile .chips{grid-column:2;display:grid;grid-auto-flow:column;justify-content:start;grid-gap:6px}
+.chip{font-size:.75rem;padding:2px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);color:var(--fg)}
+.tile.go .lamp{background:var(--go);box-shadow:0 0 22px var(--go)}
+.tile.go .st{color:var(--go)}
+.tile.wait .lamp{background:var(--go-soft);box-shadow:inset 0 0 0 4px var(--go)}
+.tile.wait .st{color:var(--go)}
+.tile.stop .lamp{background:var(--stop);box-shadow:0 0 18px var(--stop)}
+.tile.stop .st{color:var(--stop)}
+.tile.off{opacity:.6}
+.tile.off .who{text-decoration:line-through;text-decoration-thickness:2px}
+
+/* semaine */
+.week h3{font-size:1.3rem;margin-bottom:8px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:.95rem}
+thead th{font-family:var(--f-display);font-weight:600;font-size:1.05rem;letter-spacing:.03em;background:var(--panel)}
+tbody th{color:var(--muted);font-weight:400;white-space:nowrap;font-size:.85rem}
+tr:last-child th,tr:last-child td{border-bottom:0}
+td.today{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
+.s2{color:var(--muted);font-size:.85rem}
+.abs{text-decoration:line-through;opacity:.55}
+.empty{border:1px dashed var(--line);border-radius:14px;padding:28px;text-align:center;color:var(--muted)}
+.empty h2{color:var(--fg);font-size:1.8rem;margin-bottom:6px}
+
+/* config */
+.cfg{display:grid;grid-gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.card h2{font-size:1.5rem;margin-bottom:4px}
+.card > p.hint{margin:0 0 12px;color:var(--muted);font-size:.92rem;max-width:65ch}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));grid-gap:10px;align-items:end}
+label.f{display:grid;grid-gap:4px;font-size:.82rem;color:var(--muted)}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+.btn{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:#06201b;border-color:var(--accent);font-weight:700}
+.btn.danger{color:var(--stop)}
+.btn.danger.armed{background:var(--stop);color:var(--stop-ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.list{display:grid;grid-gap:8px;margin-top:12px}
+.item{display:grid;grid-template-columns:1fr auto;grid-gap:10px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.item b{font-family:var(--f-display);font-size:1.2rem;font-weight:600}
+.item .meta{color:var(--muted);font-size:.9rem}
+.people{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));grid-gap:10px}
+.person{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;grid-gap:8px}
+.person .top{display:grid;grid-template-columns:auto 1fr;grid-gap:10px;align-items:center}
+.person .lamp{width:22px;height:22px;grid-row:auto}
+.person .lamp.stop{background:var(--stop);box-shadow:0 0 10px var(--stop)}
+.person b{font-family:var(--f-display);font-size:1.35rem;font-weight:600}
+.person .acts{display:grid;grid-template-columns:1fr auto;grid-gap:8px}
+.grid td select{min-width:110px}
+.grid td .pair{display:grid;grid-gap:6px}
+.savebar{display:grid;grid-template-columns:1fr auto;grid-gap:10px;align-items:center;margin-top:12px}
+.status{font-size:.9rem;color:var(--muted)}
+.status.err{color:var(--stop)}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));grid-gap:8px;margin-top:20px;color:var(--muted);font-size:.88rem}
+.legend span .dot{width:.9em;height:.9em}
+
+@media (max-width:820px){
+  .stage{grid-template-columns:1fr}
+  .team{grid-template-columns:1fr}
+}
+@media (max-width:520px){
+  .bar{grid-template-columns:1fr auto}
+  .nav{grid-column:1 / -1;justify-self:start}
+  .clock{font-size:1.6rem}
+}
+@media (prefers-reduced-motion:reduce){.sig.go::after{animation:none;opacity:.6}}
+</style>
+</head>
+<body>
+<script type="application/json" id="seed">{"team": ["Janet", "Catherine", "Andréa"], "hours": {"start": "09:00", "noon": "12:00", "pmStart": "13:00", "end": "15:30"}, "phones": {"lun": {"am": "Janet", "pm": "Andréa"}, "mar": {"am": "Catherine", "pm": "Janet"}, "mer": {"am": "Janet", "pm": "Andréa"}, "jeu": {"am": "Catherine", "pm": "Janet"}, "ven": {"am": "Andréa", "pm": ""}}, "accueil": {"lun": {"am": ["Catherine", "Janet"], "pm": ["Catherine", "Andréa"]}, "mar": {"am": ["Janet", "Andréa"], "pm": ["Andréa", "Janet"]}, "mer": {"am": ["Andréa", "Catherine"], "pm": ["Janet", "Andréa"]}, "jeu": {"am": ["Janet", "Andréa"], "pm": ["Andréa", "Janet"]}, "ven": {"am": ["Catherine", "Janet"], "pm": ["", ""]}}, "absences": [], "status": {}, "notice": "", "updatedAt": "2026-10-26T12:50:00.000Z"}</script>
+
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand">Équipe Sélection<small>Qui aller voir pour un client à l'accueil</small></div>
+    <div class="clock" id="clock">--:--</div>
+    <nav class="nav" aria-label="Vues">
+      <a href="#affichage" id="nav-affichage">Affichage</a>
+      <a href="#config" id="nav-config">Configuration</a>
+    </nav>
+  </header>
+
+  <main id="view-display" aria-live="polite">
+    <div class="empty"><h2>Chargement de l'horaire…</h2><p>Un instant.</p></div>
+  </main>
+
+  <main id="view-config" hidden></main>
+</div>
+
+<script>
+(function(){
+var DAYS=[{k:'lun',l:'Lundi'},{k:'mar',l:'Mardi'},{k:'mer',l:'Mercredi'},{k:'jeu',l:'Jeudi'},{k:'ven',l:'Vendredi'}];
+var WD=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+var MO=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+var STANDALONE=true;
+var S={edit:null,state:'loading',cfg:null,db:null,ref:null,canWrite:true,draft:null,dirty:false,msg:'',msgErr:false,pendingCfg:false,armed:null};
+
+function $(s){return document.querySelector(s)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function pad(n){return n<10?'0'+n:''+n}
+function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function parseYmd(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2])}
+function mins(t){var p=String(t||'0:0').split(':');return (+p[0])*60+(+p[1]||0)}
+function hfmt(t){var p=String(t).split(':');return (+p[0])+' h'+(p[1]&&p[1]!=='00'?' '+p[1]:'')}
+function dayKey(d){var w=d.getDay();return (w>=1&&w<=5)?DAYS[w-1].k:null}
+function dlong(d){return WD[d.getDay()].replace(/^./,function(c){return c.toUpperCase()})+' '+d.getDate()+(d.getDate()===1?'er':'')+' '+MO[d.getMonth()]}
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function uid(){return Math.random().toString(36).slice(2,10)}
+
+function normalize(d){
+  var c=clone(d||{});
+  c.team=Array.isArray(c.team)?c.team:[];
+  c.hours=c.hours||{};
+  c.hours.start=c.hours.start||'09:00';c.hours.noon=c.hours.noon||'12:00';c.hours.pmStart=c.hours.pmStart||'13:00';c.hours.end=c.hours.end||'15:30';
+  c.phones=c.phones||{};c.accueil=c.accueil||{};
+  DAYS.forEach(function(x){
+    c.phones[x.k]=c.phones[x.k]||{am:'',pm:''};
+    c.accueil[x.k]=c.accueil[x.k]||{am:['',''],pm:['','']};
+    ['am','pm'].forEach(function(p){var a=c.accueil[x.k][p];if(!Array.isArray(a))a=['',''];while(a.length<2)a.push('');c.accueil[x.k][p]=a.slice(0,2);});
+  });
+  c.absences=Array.isArray(c.absences)?c.absences:[];
+  c.status=c.status||{};
+  c.notice=c.notice||'';
+  return c;
+}
+function blankCfg(){return normalize({team:['Janet','Catherine','Andréa']})}
+
+/* ---------- logique ---------- */
+function slotFor(now,cfg){
+  var h=cfg.hours,m=now.getHours()*60+now.getMinutes(),k=dayKey(now);
+  if(k){
+    if(m<mins(h.start))return {date:now,p:'am',when:'soon'};
+    if(m<mins(h.noon))return {date:now,p:'am',when:'now'};
+    if(m<mins(h.pmStart))return {date:now,p:'pm',when:'lunch'};
+    if(m<mins(h.end))return {date:now,p:'pm',when:'now'};
+  }
+  var d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+  while(!dayKey(d))d.setDate(d.getDate()+1);
+  return {date:d,p:'am',when:'next'};
+}
+function absenceFor(cfg,name,date,p){
+  var ds=ymd(date);
+  for(var i=0;i<cfg.absences.length;i++){var a=cfg.absences[i];
+    if(a.name===name&&a.from<=ds&&ds<=(a.to||a.from)&&(a.part==='jour'||a.part===p))return a;}
+  return null;
+}
+function dndFor(cfg,name,now){
+  var s=cfg.status[name];
+  if(s&&s.dnd&&(!s.until||new Date(s.until)>now))return s;
+  return null;
+}
+function resolve(cfg,date,p,now,live){
+  var k=dayKey(date),r={phone:'',acc:[],avail:[],skipped:[],people:{}};
+  if(!k)return r;
+  r.phone=cfg.phones[k][p]||'';
+  r.acc=cfg.accueil[k][p].filter(Boolean);
+  cfg.team.forEach(function(n){r.people[n]={abs:absenceFor(cfg,n,date,p),dnd:live?dndFor(cfg,n,now):null};});
+  r.acc.forEach(function(n,i){
+    var st=r.people[n]||{};
+    if(st.abs)r.skipped.push({name:n,rank:i,why:'en congé'});
+    else if(st.dnd)r.skipped.push({name:n,rank:i,why:'ne pas déranger'});
+    else r.avail.push({name:n,rank:i});
+  });
+  return r;
+}
+
+/* ---------- affichage ---------- */
+function sigCard(kind,size,label,name,sub,phone){
+  return '<div class="sig '+kind+' '+size+'"><div class="lbl"><span class="dot"></span>'+esc(label)+'</div>'+
+    '<div class="name">'+esc(name)+'</div>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'')+
+    (phone?'<div class="phone">Peut être au téléphone</div>':'')+'</div>';
+}
+function renderDisplay(){
+  var el=$('#view-display'),cfg=S.cfg;
+  if(S.state==='loading'){el.innerHTML='<div class="empty"><h2>Chargement de l\'horaire…</h2><p>Un instant.</p></div>';return;}
+  if(S.state==='nodb'||S.state==='err'){el.innerHTML='<div class="empty"><h2>Horaire inaccessible</h2><p>'+(STANDALONE?'Le fichier horaire.json est introuvable ou mal formé. Il doit être dans le même dossier que cette page.':'Cette page doit être ouverte dans Claude par une personne connectée qui a accès au lien partagé.')+'</p></div>';return;}
+  if(!cfg){el.innerHTML='<div class="empty"><h2>Aucun horaire configuré</h2><p>Ouvrez l\'onglet <a href="#config" style="color:var(--accent)">Configuration</a> pour entrer l\'horaire de l\'équipe.</p></div>';return;}
+  var now=new Date(),sl=slotFor(now,cfg),live=sl.when==='now',r=resolve(cfg,sl.date,sl.p,now,live);
+  var per=sl.p==='am'?'Avant-midi':'Après-midi';
+  var whenPill=live?'<span class="pill live">● En ce moment</span>':
+    sl.when==='soon'?'<span class="pill">Dès '+hfmt(cfg.hours.start)+'</span>':sl.when==='lunch'?'<span class="pill">Dîner · retour à '+hfmt(cfg.hours.pmStart)+'</span>':'<span class="pill">Prochain quart</span>';
+  var h='<div class="ctx"><div><div class="eyebrow">Accueil · walk-in Sélection</div><h2>'+esc(dlong(sl.date))+' · '+per+'</h2></div>'+whenPill+'</div>';
+  if(cfg.notice)h+='<div class="notice">'+esc(cfg.notice)+'</div>';
+
+  var a0=r.avail[0],a1=r.avail[1],main,side='';
+  if(a0){
+    var sub=a0.rank===0?'1er choix':'Remplace '+r.skipped[0].name+' ('+r.skipped[0].why+')';
+    main=sigCard('go','big','Aller voir',a0.name,sub,r.phone===a0.name);
+  }else if(r.acc.length){
+    main=sigCard('stop','big','Personne de disponible','Aucune',r.skipped.map(function(s){return s.name+' : '+s.why}).join(' · '));
+  }else{
+    main=sigCard('none','big','Accueil','Personne de prévu','Aucune personne de la Sélection à l\'horaire pour ce quart.');
+  }
+  if(a1)side+=sigCard('wait','small','Si non disponible',a1.name,'2e choix',r.phone===a1.name);
+  else if(a0)side+=sigCard('none','small','2e choix','—',r.skipped.length&&a0.rank===0?r.skipped[0].name+' : '+r.skipped[0].why:'Pas de 2e choix pour ce quart');
+  // autre demi-journée
+  var nxt=null;
+  if(sl.p==='am'){nxt={date:sl.date,p:'pm',t:'Cet après-midi'};}
+  else{var d=new Date(sl.date.getFullYear(),sl.date.getMonth(),sl.date.getDate()+1);while(!dayKey(d))d.setDate(d.getDate()+1);nxt={date:d,p:'am',t:dlong(d)+' · avant-midi'};}
+  if(sl.when==='next')nxt.t=dlong(sl.date)+' · après-midi';
+  var rn=resolve(cfg,nxt.date,nxt.p,now,false);
+  var nTxt=rn.avail.length?'Accueil : <b>'+esc(rn.avail[0].name)+'</b>'+(rn.avail[1]?', 2e <b>'+esc(rn.avail[1].name)+'</b>':''):'Accueil : personne de prévu';
+  nTxt+=' · Téléphonie : <b>'+esc(rn.phone||'—')+'</b>';
+  side+='<div class="later"><div class="eyebrow">Ensuite</div><h3>'+esc(nxt.t.replace(/^./,function(c){return c.toUpperCase()}))+'</h3><p>'+nTxt+'</p></div>';
+  h+='<div class="stage">'+main+'<div class="side">'+side+'</div></div>';
+
+  // équipe
+  h+='<div class="team">';
+  cfg.team.forEach(function(n){
+    var st=r.people[n]||{},cls='idle',txt='Au bureau',chips=[];
+    var ai=-1;r.avail.forEach(function(a,i){if(a.name===n)ai=i;});
+    if(st.abs){cls='off';txt='En congé'+(st.abs.note?' · '+st.abs.note:'');}
+    else if(st.dnd){cls='stop';txt='Ne pas déranger'+(st.dnd.note?' · '+st.dnd.note:'')+(st.dnd.until?' · jusqu\'à '+timeOf(st.dnd.until):'');}
+    else if(ai===0){cls='go';txt='Aller voir en premier';}
+    else if(ai===1){cls='wait';txt='2e choix';}
+    else if(r.phone===n){cls='stop';txt='Téléphonie · ne pas déranger';}
+    if(r.phone===n&&(cls==='go'||cls==='wait'))chips.push('Peut être au téléphone');
+    if(r.phone===n&&st.abs)chips.push('Téléphonie à couvrir');
+    h+='<div class="tile '+cls+'"><div class="lamp" aria-hidden="true"></div><div class="who">'+esc(n)+'</div><div class="st">'+esc(txt)+'</div>'+
+      (chips.length?'<div class="chips">'+chips.map(function(c){return '<span class="chip">'+esc(c)+'</span>'}).join('')+'</div>':'')+'</div>';
+  });
+  h+='</div>';
+
+  h+=weekTable(cfg,sl,now);
+  h+='<div class="legend"><span><span class="dot" style="color:var(--go)"></span>Vert : aller voir cette personne</span>'+
+     '<span><span class="dot" style="color:var(--go);opacity:.4"></span>Vert pâle : 2e choix, si la première n\'est pas disponible</span>'+
+     '<span><span class="dot" style="color:var(--stop)"></span>Rouge : téléphonie ou ne pas déranger</span>'+
+     '<span><span class="dot" style="color:var(--off)"></span>Gris : en congé</span></div>';
+  el.innerHTML=h;
+}
+function timeOf(iso){var d=new Date(iso);return hfmt(pad(d.getHours())+':'+pad(d.getMinutes()))}
+function weekTable(cfg,sl,now){
+  var base=new Date(sl.date.getFullYear(),sl.date.getMonth(),sl.date.getDate());
+  var mon=new Date(base);mon.setDate(base.getDate()-((base.getDay()+6)%7));
+  var dates=DAYS.map(function(_,i){var d=new Date(mon);d.setDate(mon.getDate()+i);return d;});
+  var today=ymd(now),cur=ymd(sl.date);
+  function nm(n,d,p){if(!n)return '—';return absenceFor(cfg,n,d,p)?'<span class="abs">'+esc(n)+'</span>':esc(n)}
+  var h='<section class="week"><h3>Semaine du '+mon.getDate()+' '+MO[mon.getMonth()]+'</h3><div class="scroll"><table><thead><tr><th></th>';
+  dates.forEach(function(d,i){h+='<th>'+DAYS[i].l+' '+d.getDate()+'</th>'});
+  h+='</tr></thead><tbody>';
+  [['Accueil AM','acc','am'],['Accueil PM','acc','pm'],['Téléphonie AM','ph','am'],['Téléphonie PM','ph','pm']].forEach(function(row){
+    h+='<tr><th scope="row">'+row[0]+'</th>';
+    dates.forEach(function(d,i){
+      var k=DAYS[i].k,ds=ymd(d),c=(ds===today?'today':'')+(ds===cur&&row[2]===sl.p&&sl.when==='now'?' cur':''),v;
+      if(row[1]==='acc'){var a=cfg.accueil[k][row[2]];v=a[0]||a[1]?nm(a[0],d,row[2])+(a[1]?'<div class="s2">2e '+nm(a[1],d,row[2])+'</div>':''):'—';}
+      else v=nm(cfg.phones[k][row[2]],d,row[2]);
+      h+='<td class="'+c+'">'+v+'</td>';
+    });
+    h+='</tr>';
+  });
+  return h+'</tbody></table></div></section>';
+}
+
+/* ---------- configuration ---------- */
+function opts(team,val,blank){
+  var h='<option value="">'+(blank||'—')+'</option>';
+  team.forEach(function(n){h+='<option'+(n===val?' selected':'')+'>'+esc(n)+'</option>'});
+  if(val&&team.indexOf(val)<0)h+='<option selected>'+esc(val)+'</option>';
+  return h;
+}
+function base(){return STANDALONE?(S.edit||S.cfg):S.cfg}
+function renderConfig(){
+  var el=$('#view-config');
+  var ae=document.activeElement;
+  if(ae&&el.contains(ae)&&/INPUT|SELECT|TEXTAREA/.test(ae.tagName)&&!S.forceCfg){S.pendingCfg=true;return;}
+  S.forceCfg=false;S.pendingCfg=false;
+  if(S.state==='loading'){el.innerHTML='<div class="empty"><h2>Chargement…</h2></div>';return;}
+  if(S.state!=='ok'&&!(STANDALONE&&base())){el.innerHTML='<div class="empty"><h2>Configuration inaccessible</h2><p>'+(STANDALONE?'Le fichier horaire.json est introuvable ou mal formé. Il doit être dans le même dossier que cette page.':'Ouvrez cette page dans Claude, connecté avec un compte qui a accès au lien.')+'</p></div>';return;}
+  var ro=!S.canWrite,dis=ro?' disabled':'';
+  if(!base()){
+    el.innerHTML='<div class="empty"><h2>Aucun horaire</h2><p>Créez l\'horaire de départ, puis ajustez-le.</p><p><button class="btn primary" id="mk"'+dis+'>Créer l\'horaire</button></p></div>';
+    return;
+  }
+  var cfg=base();
+  if(!S.dirty||!S.draft)S.draft={team:cfg.team.slice(),hours:clone(cfg.hours),phones:clone(cfg.phones),accueil:clone(cfg.accueil)};
+  var D=S.draft,h='<div class="cfg">';
+  if(STANDALONE)h+=exportCard(cfg);
+  if(ro)h+='<div class="notice">Vous avez accès en lecture seulement. Demandez à la personne propriétaire de la page de vous donner l\'accès Contributeur.</div>';
+
+  // statut immédiat
+  var now=new Date();
+  h+='<section class="card"><h2>Statut immédiat</h2><p class="hint">Pour une rencontre, une formation ou un dossier urgent. La personne passe au rouge et l\'accueil va voir la suivante.</p><div class="people">';
+  cfg.team.forEach(function(n,i){
+    var s=dndFor(cfg,n,now);
+    h+='<div class="person"><div class="top"><span class="lamp'+(s?' stop':'')+'"></span><div><b>'+esc(n)+'</b><div class="meta" style="color:var(--muted);font-size:.88rem">'+
+      (s?'Ne pas déranger'+(s.until?' jusqu\'à '+timeOf(s.until):'')+(s.note?' · '+esc(s.note):''):'Selon l\'horaire')+'</div></div></div>';
+    if(s)h+='<button class="btn" data-act="clear" data-n="'+i+'"'+dis+'>Remettre selon l\'horaire</button>';
+    else h+='<input id="dn-note-'+i+'" placeholder="Raison (facultatif)"'+dis+'><div class="acts"><select id="dn-dur-'+i+'"'+dis+'><option value="30">30 minutes</option><option value="60" selected>1 heure</option><option value="120">2 heures</option><option value="day">Jusqu\'à la fin de la journée</option></select><button class="btn" data-act="dnd" data-n="'+i+'"'+dis+'>Ne pas déranger</button></div>';
+    h+='</div>';
+  });
+  h+='</div></section>';
+
+  // message
+  h+='<section class="card"><h2>Message à l\'écran</h2><p class="hint">S\'affiche en haut de l\'affichage. Laisser vide pour l\'enlever.</p><div class="savebar"><input id="notice" value="'+esc(cfg.notice)+'" placeholder="Ex. : Équipe en réunion jusqu\'à 10 h"'+dis+'><button class="btn primary" data-act="notice"'+dis+'>Afficher</button></div></section>';
+
+  // absences
+  var today=ymd(now);
+  var list=cfg.absences.filter(function(a){return (a.to||a.from)>=today}).sort(function(a,b){return a.from<b.from?-1:1});
+  h+='<section class="card"><h2>Congés et absences</h2><p class="hint">Vacances, maladie, formation. La personne passe au gris et le 2e choix devient le premier automatiquement.</p>'+
+    '<div class="row"><label class="f">Personne<select id="ab-name"'+dis+'>'+opts(cfg.team,'','Choisir…')+'</select></label>'+
+    '<label class="f">Du<input type="date" id="ab-from" value="'+today+'"'+dis+'></label>'+
+    '<label class="f">Au (inclus)<input type="date" id="ab-to" value="'+today+'"'+dis+'></label>'+
+    '<label class="f">Période<select id="ab-part"'+dis+'><option value="jour">Journée complète</option><option value="am">Avant-midi</option><option value="pm">Après-midi</option></select></label>'+
+    '<label class="f">Note<input id="ab-note" placeholder="Ex. : Vacances"'+dis+'></label>'+
+    '<button class="btn primary" data-act="addabs"'+dis+'>Ajouter</button></div><div class="list">';
+  if(!list.length)h+='<div class="item"><span class="meta">Aucune absence prévue.</span></div>';
+  list.forEach(function(a){
+    var f=parseYmd(a.from),t=parseYmd(a.to||a.from);
+    var range=a.from===(a.to||a.from)?dlong(f):'Du '+dlong(f)+' au '+dlong(t);
+    var part=a.part==='am'?' · avant-midi':a.part==='pm'?' · après-midi':'';
+    var armed=S.armed===a.id;
+    h+='<div class="item"><div><b>'+esc(a.name)+'</b> <span class="meta">'+esc(range+part)+(a.note?' · '+esc(a.note):'')+'</span></div>'+
+      '<button class="btn danger'+(armed?' armed':'')+'" data-act="delabs" data-id="'+esc(a.id)+'"'+dis+'>'+(armed?'Confirmer':'Retirer')+'</button></div>';
+  });
+  h+='</div></section>';
+
+  // horaire de base
+  h+='<section class="card"><h2>Horaire de base</h2><p class="hint">L\'horaire qui revient chaque semaine. Les changements s\'appliquent à l\'enregistrement.</p>';
+  h+='<div class="row" style="margin-bottom:14px">';
+  D.team.forEach(function(n,i){h+='<label class="f">Membre '+(i+1)+'<input id="tm-'+i+'" data-team="'+i+'" value="'+esc(n)+'"'+dis+'></label>'});
+  h+='<label class="f">Début avant-midi<input type="time" id="hr-start" data-hr="start" value="'+D.hours.start+'"'+dis+'></label>'+
+     '<label class="f">Fin avant-midi<input type="time" id="hr-noon" data-hr="noon" value="'+D.hours.noon+'"'+dis+'></label>'+
+     '<label class="f">Début après-midi<input type="time" id="hr-pm" data-hr="pmStart" value="'+D.hours.pmStart+'"'+dis+'></label>'+
+     '<label class="f">Fin après-midi<input type="time" id="hr-end" data-hr="end" value="'+D.hours.end+'"'+dis+'></label></div>';
+  h+='<div class="scroll grid"><table><thead><tr><th></th>';
+  DAYS.forEach(function(d){h+='<th>'+d.l+'</th>'});
+  h+='</tr></thead><tbody>';
+  [['Accueil AM','acc','am'],['Accueil PM','acc','pm'],['Téléphonie AM','ph','am'],['Téléphonie PM','ph','pm']].forEach(function(row){
+    h+='<tr><th scope="row">'+row[0]+'</th>';
+    DAYS.forEach(function(d){
+      if(row[1]==='acc'){var a=D.accueil[d.k][row[2]];
+        h+='<td><div class="pair"><select id="ac-'+d.k+'-'+row[2]+'-0" data-acc="'+d.k+'|'+row[2]+'|0" aria-label="'+d.l+' '+row[0]+' 1er choix"'+dis+'>'+opts(D.team,a[0],'1er —')+'</select>'+
+          '<select id="ac-'+d.k+'-'+row[2]+'-1" data-acc="'+d.k+'|'+row[2]+'|1" aria-label="'+d.l+' '+row[0]+' 2e choix"'+dis+'>'+opts(D.team,a[1],'2e —')+'</select></div></td>';
+      }else{
+        h+='<td><select id="ph-'+d.k+'-'+row[2]+'" data-ph="'+d.k+'|'+row[2]+'" aria-label="'+d.l+' '+row[0]+'"'+dis+'>'+opts(D.team,D.phones[d.k][row[2]])+'</select></td>';
+      }
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table></div><div class="savebar"><span class="status'+(S.msgErr?' err':'')+'" id="msg">'+esc(S.msg||(S.dirty?'Modifications non enregistrées.':''))+'</span>'+
+    '<span>'+(S.dirty?'<button class="btn" data-act="cancel">Annuler</button> ':'')+'<button class="btn primary" data-act="savebase"'+(ro||!S.dirty?' disabled':'')+'>Enregistrer l\'horaire</button></span></div></section>';
+  h+='</div>';
+  el.innerHTML=h;
+}
+
+/* ---------- écriture ---------- */
+var chain=Promise.resolve();
+function save(mut,okMsg){
+  var c=normalize(base()||blankCfg());mut(c);c.updatedAt=new Date().toISOString();
+  if(STANDALONE){S.edit=c;try{localStorage.setItem('horaire-edit',JSON.stringify(c))}catch(e){}
+    S.forceCfg=true;render();flash('Changement prêt. Copiez le fichier en haut pour le publier.');return Promise.resolve();}
+  S.cfg=c;render();
+  chain=chain.then(function(){return S.ref.set(c)}).then(function(){flash(okMsg||'Enregistré.')},function(e){
+    if(e&&e.code==='invalid_argument'){S.canWrite=false;flash('Vous n\'avez pas le droit de modifier cet horaire.',true)}
+    else flash('Pas enregistré : la connexion a échoué. Réessayez dans un moment.',true);
+  });
+  return chain;
+}
+function flash(m,err){S.msg=m;S.msgErr=!!err;var e=$('#msg');if(e){e.textContent=m;e.className='status'+(err?' err':'')}
+  clearTimeout(flash.t);flash.t=setTimeout(function(){S.msg='';var e2=$('#msg');if(e2&&!S.dirty)e2.textContent=''},4000);}
+
+document.addEventListener('click',function(ev){
+  var b=ev.target.closest&&ev.target.closest('[data-act]'),mk=ev.target.closest&&ev.target.closest('#mk');
+  if(mk&&S.ref){save(function(){},'Horaire créé.');return;}
+  if(!b||b.disabled)return;
+  var act=b.getAttribute('data-act'),cfg=S.cfg;
+  if(act!=='delabs'&&S.armed){S.armed=null;}
+  if(act==='dnd'){
+    var i=+b.getAttribute('data-n'),n=cfg.team[i],dur=$('#dn-dur-'+i).value,note=$('#dn-note-'+i).value.trim(),until;
+    var now=new Date();
+    if(dur==='day'){var e=mins(cfg.hours.end);until=new Date(now.getFullYear(),now.getMonth(),now.getDate(),Math.floor(e/60),e%60);}
+    else until=new Date(now.getTime()+(+dur)*60000);
+    S.forceCfg=true;save(function(c){c.status[n]={dnd:true,until:until.toISOString(),note:note}},n+' : ne pas déranger.');
+  }else if(act==='clear'){
+    var n2=cfg.team[+b.getAttribute('data-n')];S.forceCfg=true;
+    save(function(c){delete c.status[n2]},n2+' : selon l\'horaire.');
+  }else if(act==='notice'){
+    var v=$('#notice').value.trim();S.forceCfg=true;save(function(c){c.notice=v},v?'Message affiché.':'Message retiré.');
+  }else if(act==='addabs'){
+    var a={id:uid(),name:$('#ab-name').value,from:$('#ab-from').value,to:$('#ab-to').value||$('#ab-from').value,part:$('#ab-part').value,note:$('#ab-note').value.trim()};
+    if(!a.name){flash('Choisissez la personne absente.',true);return;}
+    if(!a.from){flash('Indiquez la date de début.',true);return;}
+    if(a.to<a.from){flash('La date de fin est avant la date de début.',true);return;}
+    S.forceCfg=true;save(function(c){c.absences.push(a)},'Absence ajoutée pour '+a.name+'.');
+  }else if(act==='delabs'){
+    var id=b.getAttribute('data-id');
+    if(S.armed!==id){S.armed=id;S.forceCfg=true;renderConfig();return;}
+    S.armed=null;S.forceCfg=true;save(function(c){c.absences=c.absences.filter(function(x){return x.id!==id})},'Absence retirée.');
+  }else if(act==='savebase'){
+    var D=S.draft;S.dirty=false;S.forceCfg=true;
+    save(function(c){
+      // renommer partout
+      c.team.forEach(function(old,i){var nw=D.team[i];if(nw&&old!==nw){
+        c.absences.forEach(function(x){if(x.name===old)x.name=nw});
+        if(c.status[old]){c.status[nw]=c.status[old];delete c.status[old];}
+      }});
+      c.team=D.team.filter(Boolean);c.hours=D.hours;c.phones=D.phones;c.accueil=D.accueil;
+    },'Horaire enregistré.');
+  }else if(act==='copy'){
+    var ta=$('#export'),txt=ta.value;
+    var fb=function(){ta.focus();ta.select();try{document.execCommand('copy');flash('Copié.')}catch(e){flash('Sélectionnez le texte et copiez-le.',true)}};
+    try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){flash('Copié. Collez-le dans horaire.json sur GitHub.')},fb);else fb();}catch(e){fb()}
+  }else if(act==='discard'){
+    S.edit=null;S.dirty=false;S.draft=null;try{localStorage.removeItem('horaire-edit')}catch(e){}S.forceCfg=true;renderConfig();flash('Retour à la version en ligne.');
+  }else if(act==='cancel'){S.dirty=false;S.draft=null;S.forceCfg=true;renderConfig();}
+});
+document.addEventListener('change',function(ev){
+  var t=ev.target,D=S.draft;if(!D)return;
+  if(t.hasAttribute('data-team')){
+    var i=+t.getAttribute('data-team'),old=D.team[i],nw=t.value.trim();if(!nw||old===nw)return;
+    D.team[i]=nw;
+    DAYS.forEach(function(d){['am','pm'].forEach(function(p){
+      if(D.phones[d.k][p]===old)D.phones[d.k][p]=nw;
+      D.accueil[d.k][p]=D.accueil[d.k][p].map(function(x){return x===old?nw:x});
+    })});
+    S.dirty=true;S.forceCfg=true;renderConfig();return;
+  }
+  if(t.hasAttribute('data-hr')){D.hours[t.getAttribute('data-hr')]=t.value;S.dirty=true;}
+  else if(t.hasAttribute('data-ph')){var p=t.getAttribute('data-ph').split('|');D.phones[p[0]][p[1]]=t.value;S.dirty=true;}
+  else if(t.hasAttribute('data-acc')){var q=t.getAttribute('data-acc').split('|');D.accueil[q[0]][q[1]][+q[2]]=t.value;S.dirty=true;}
+  else return;
+  S.msg='';var m=$('#msg');if(m){m.textContent='Modifications non enregistrées.';m.className='status'}
+  var sb=document.querySelector('[data-act="savebase"]');if(sb&&S.canWrite)sb.disabled=false;
+});
+document.addEventListener('focusout',function(){setTimeout(function(){if(S.pendingCfg)renderConfig()},250)});
+
+function ghEditUrl(){
+  var m=location.hostname.match(/^([^.]+)\.github\.io$/);if(!m)return '';
+  var parts=location.pathname.split('/').filter(Boolean);var repo=parts.length&&!/\.html?$/.test(parts[0])?parts[0]:m[1]+'.github.io';
+  return 'https://github.com/'+m[1]+'/'+repo+'/edit/main/horaire.json';
+}
+function exportCard(cfg){
+  var changed=!!S.edit,gh=ghEditUrl();
+  return '<section class="card"><h2>Publier les changements</h2><p class="hint">'+
+    (changed?'Vous avez des changements sur cet appareil qui ne sont <b style="color:var(--wait)">pas encore publiés</b>. ':'Aucun changement en attente. ')+
+    'Pour publier : 1) Copier le fichier. 2) Ouvrir horaire.json sur GitHub (crayon). 3) Tout remplacer par le texte copié. 4) Commit changes. Les écrans se mettent à jour dans les minutes suivantes.</p>'+
+    '<textarea id="export" readonly rows="5" style="font-family:ui-monospace,Menlo,monospace;font-size:.8rem">'+esc(JSON.stringify(cfg,null,2))+'</textarea>'+
+    '<div class="savebar"><span></span><span><button class="btn" data-act="copy">Copier le fichier</button> '+
+    (gh?'<a class="btn" style="text-decoration:none;display:inline-block" href="'+esc(gh)+'" target="_blank" rel="noopener">Ouvrir horaire.json sur GitHub</a> ':'')+
+    (changed?'<button class="btn danger" data-act="discard">Abandonner mes changements</button>':'')+'</span></div></section>';
+}
+function loadJson(){
+  var x=new XMLHttpRequest();
+  x.open('GET','horaire.json?t='+Date.now());
+  x.onload=function(){
+    if(x.status>=200&&x.status<300){try{S.cfg=normalize(JSON.parse(x.responseText));S.state='ok';}catch(e){if(!S.cfg)useSeed();}}
+    else if(!S.cfg)useSeed();
+    if(view()==='affichage')renderDisplay();else renderConfig();
+  };
+  x.onerror=function(){if(!S.cfg)useSeed();if(view()==='affichage')renderDisplay();else renderConfig();};
+  x.send();
+}
+function useSeed(){var el=document.getElementById('seed');if(el){try{S.cfg=normalize(JSON.parse(el.textContent));S.state='ok';return;}catch(e){}}S.state='err';}
+
+/* ---------- vues ---------- */
+function view(){return location.hash==='#config'?'config':'affichage'}
+function render(){
+  var v=view();
+  $('#view-display').hidden=v!=='affichage';$('#view-config').hidden=v!=='config';
+  $('#nav-affichage').setAttribute('aria-current',v==='affichage'?'page':'false');
+  $('#nav-config').setAttribute('aria-current',v==='config'?'page':'false');
+  if(v==='affichage')renderDisplay();else renderConfig();
+}
+function tick(){var d=new Date();$('#clock').textContent=d.getHours()+' h '+pad(d.getMinutes());}
+window.addEventListener('hashchange',function(){S.forceCfg=true;render()});
+tick();render();
+setInterval(tick,5000);
+setInterval(function(){if(view()==='affichage')renderDisplay();},30000);
+
+// garder l'écran allumé quand c'est permis
+var lock=null;
+function wake(){try{if(navigator.wakeLock&&document.visibilityState==='visible')navigator.wakeLock.request('screen').then(function(l){lock=l},function(){})}catch(e){}}
+document.addEventListener('visibilitychange',wake);wake();
+
+/* ---------- données partagées ---------- */
+function waitClaude(ms){return new Promise(function(res){var t0=Date.now();(function chk(){if(window.claude&&window.claude.use)return res(window.claude);if(Date.now()-t0>ms)return res(null);setTimeout(chk,100)})()})}
+if(STANDALONE){
+  try{var ed=localStorage.getItem('horaire-edit');if(ed)S.edit=normalize(JSON.parse(ed));}catch(e){}
+  loadJson();setInterval(loadJson,60000);
+}else waitClaude(6000).then(function(cl){
+  if(!cl){S.state='nodb';render();return null;}
+  return cl.use('db').then(function(db){
+    if(!db){S.state='nodb';render();return;}
+    S.db=db;S.ref=db.doc('horaire/config');
+    cl.use('user').then(function(u){
+      if(!u||!u.can)return;
+      return Promise.resolve(u.can('data.write')).then(function(c){if(c===false){S.canWrite=false;S.forceCfg=true;render();}});
+    }).catch(function(){});
+    S.ref.onSnapshot(function(s){
+      S.state='ok';S.cfg=s.exists?normalize(s.data()):null;
+      if(view()==='affichage')renderDisplay();else renderConfig();
+    },function(e){S.state='err';render();});
+  });
+}).catch(function(){S.state='nodb';render();});
+})();
+</script>
+
+</body>
+</html>

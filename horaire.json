@@ -1,0 +1,91 @@
+{
+  "team": [
+    "Janet",
+    "Catherine",
+    "Andréa"
+  ],
+  "hours": {
+    "start": "09:00",
+    "noon": "12:00",
+    "pmStart": "13:00",
+    "end": "15:30"
+  },
+  "phones": {
+    "lun": {
+      "am": "Janet",
+      "pm": "Andréa"
+    },
+    "mar": {
+      "am": "Catherine",
+      "pm": "Janet"
+    },
+    "mer": {
+      "am": "Janet",
+      "pm": "Andréa"
+    },
+    "jeu": {
+      "am": "Catherine",
+      "pm": "Janet"
+    },
+    "ven": {
+      "am": "Andréa",
+      "pm": ""
+    }
+  },
+  "accueil": {
+    "lun": {
+      "am": [
+        "Catherine",
+        "Janet"
+      ],
+      "pm": [
+        "Catherine",
+        "Andréa"
+      ]
+    },
+    "mar": {
+      "am": [
+        "Janet",
+        "Andréa"
+      ],
+      "pm": [
+        "Andréa",
+        "Janet"
+      ]
+    },
+    "mer": {
+      "am": [
+        "Andréa",
+        "Catherine"
+      ],
+      "pm": [
+        "Janet",
+        "Andréa"
+      ]
+    },
+    "jeu": {
+      "am": [
+        "Janet",
+        "Andréa"
+      ],
+      "pm": [
+        "Andréa",
+        "Janet"
+      ]
+    },
+    "ven": {
+      "am": [
+        "Catherine",
+        "Janet"
+      ],
+      "pm": [
+        "",
+        ""
+      ]
+    }
+  },
+  "absences": [],
+  "status": {},
+  "notice": "",
+  "updatedAt": "2026-10-26T12:50:00.000Z"
+}
