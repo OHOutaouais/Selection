@@ -703,6 +703,9 @@ function tick(){var d=new Date();$('#clock').textContent=d.getHours()+' h '+pad(
 window.addEventListener('hashchange',function(){S.forceCfg=true;render()});
 tick();render();
 setInterval(tick,5000);
+// recharger chaque nuit vers 3 h pour prendre la dernière version
+var loadedOn=ymd(new Date());
+setInterval(function(){var d=new Date();if(STANDALONE&&ymd(d)!==loadedOn&&d.getHours()>=3){try{location.reload()}catch(e){}}},600000);
 setInterval(function(){var ae=document.activeElement;if(view()==='affichage'&&!(ae&&/INPUT|SELECT/.test(ae.tagName)))renderDisplay();},30000);
 
 // garder l'écran allumé quand c'est permis
