@@ -225,14 +225,18 @@ function normalize(d){
   c.notice=c.notice||'';
   return c;
 }
+function fbOn(){return !!(STANDALONE&&FB_URL&&teamCode()&&S.liveErr!==401)}
 function tempState(){
   var t=ymd(new Date()),v=null;
-  try{v=JSON.parse(localStorage.getItem('horaire-temp')||'null')}catch(e){}
+  if(fbOn()){v=S.today?clone(S.today):null;if(v&&!Array.isArray(v.away))v.away=v.away?Object.keys(v.away).map(function(k){return v.away[k]}):[];}
+  else try{v=JSON.parse(localStorage.getItem('horaire-temp')||'null')}catch(e){}
   if(!v||v.date!==t||!Array.isArray(v.away))return {date:t,away:[],subs:{}};
   v.subs=v.subs||{};return v;
 }
 function tempAway(){return tempState().away}
-function saveTemp(v){v.date=ymd(new Date());try{localStorage.setItem('horaire-temp',JSON.stringify(v))}catch(e){}}
+function saveTemp(v){v.date=ymd(new Date());
+  if(fbOn()){S.today=clone(v);fbReq('PUT','aujourdhui',v,function(err){if(err){S.tempErr=true;renderDisplay();}else{S.tempErr=false;pollLive();}});return;}
+  try{localStorage.setItem('horaire-temp',JSON.stringify(v))}catch(e){}}
 function withTemp(cfg){
   var c=cfg,nowMs=Date.now();
   if(STANDALONE&&S.live){c=clone(cfg);Object.keys(S.live).forEach(function(n){var v=S.live[n];
@@ -352,7 +356,7 @@ function renderDisplay(){
   if(STANDALONE&&FB_URL&&(!teamCode()||S.liveErr===401))h+='<p class="s2" style="margin-top:16px">Statuts en direct inactifs sur cet appareil. Ouvrez « Mon statut » pour entrer le code d\'équipe.</p>';
   if(STANDALONE){
     var away=tempAway();
-    h+='<section class="temp"><h3>Absent aujourd\'hui</h3><p>Touchez un nom pour le retirer de l\'horaire d\'aujourd\'hui, et inscrivez au besoin qui le remplace. Ce changement reste <b>sur cet appareil seulement</b> et s\'efface à minuit.</p><div class="tempbtns">';
+    h+='<section class="temp"><h3>Absent aujourd\'hui</h3><p>Touchez un nom pour le retirer de l\'horaire d\'aujourd\'hui, et inscrivez au besoin qui le remplace. '+(fbOn()?'Ce changement est <b>partagé avec tous les écrans</b> et s\'efface à minuit.':'Ce changement reste <b>sur cet appareil seulement</b> et s\'efface à minuit.')+(S.tempErr?' <b style="color:var(--stop)">Le dernier changement n\'a pas été envoyé : vérifiez la connexion.</b>':'')+'</p><div class="tempbtns">';
     var subs=tempState().subs;
     S.cfg.team.forEach(function(n,i){var on=away.indexOf(n)>=0;
       h+='<div class="tcell"><button class="btn tbtn'+(on?' on':'')+'" data-act="tmp" data-n="'+i+'" aria-pressed="'+on+'">'+esc(n)+(on?' · absent':'')+'</button>'+
@@ -391,7 +395,7 @@ function opts(team,val,blank){
   if(val&&team.indexOf(val)<0)h+='<option selected>'+esc(val)+'</option>';
   return h;
 }
-function base(){return STANDALONE?(S.edit||S.cfg):S.cfg}
+function base(){return (STANDALONE&&!fbOn())?(S.edit||S.cfg):S.cfg}
 function renderConfig(){
   var el=$('#view-config');
   var ae=document.activeElement;
@@ -407,7 +411,8 @@ function renderConfig(){
   var cfg=base();
   if(!S.dirty||!S.draft)S.draft={team:cfg.team.slice(),hours:clone(cfg.hours),phones:clone(cfg.phones),accueil:clone(cfg.accueil)};
   var D=S.draft,h='<div class="cfg">';
-  if(STANDALONE)h+=exportCard(cfg);
+  if(STANDALONE&&fbOn())h+='<div class="notice">Les changements sont enregistrés <b>en direct</b> : tous les écrans les voient en moins de 15 secondes.</div>';
+  else if(STANDALONE)h+=exportCard(cfg);
   if(ro)h+='<div class="notice">Vous avez accès en lecture seulement. Demandez à la personne propriétaire de la page de vous donner l\'accès Contributeur.</div>';
 
   // statut immédiat
@@ -483,6 +488,15 @@ function renderConfig(){
 var chain=Promise.resolve();
 function save(mut,okMsg){
   var c=normalize(base()||blankCfg());mut(c);c.updatedAt=new Date().toISOString();
+  if(STANDALONE&&fbOn()){
+    S.fbCfg=c;S.cfg=c;render();
+    fbReq('PUT','config',c,function(err){
+      if(err===401){S.liveErr=401;flash('Code d\'équipe invalide sur cet appareil. Entrez-le dans « Mon statut ».',true);}
+      else if(err)flash('Pas enregistré : vérifiez la connexion internet et réessayez.',true);
+      else flash(okMsg||'Enregistré.');
+    });
+    return Promise.resolve();
+  }
   if(STANDALONE){S.edit=c;try{localStorage.setItem('horaire-edit',JSON.stringify(c))}catch(e){}
     S.forceCfg=true;render();flash('Changement prêt. Copiez le fichier en haut pour le publier.');return Promise.resolve();}
   S.cfg=c;render();
@@ -607,7 +621,7 @@ function loadJson(){
   var x=new XMLHttpRequest();
   x.open('GET','horaire.json?t='+Date.now());
   x.onload=function(){
-    if(x.status>=200&&x.status<300){try{S.cfg=normalize(JSON.parse(x.responseText));S.state='ok';}catch(e){if(!S.cfg)useSeed();}}
+    if(x.status>=200&&x.status<300){try{S.jsonCfg=normalize(JSON.parse(x.responseText));if(!S.fbCfg)S.cfg=S.jsonCfg;S.state='ok';}catch(e){if(!S.cfg)useSeed();}}
     else if(!S.cfg)useSeed();
     refreshView();
   };
@@ -625,7 +639,7 @@ function teamCode(){
 function getMe(){try{return localStorage.getItem('horaire-me')||''}catch(e){return ''}}
 function fbReq(method,path,body,cb){
   var x=new XMLHttpRequest();
-  x.open(method,FB_URL+'e/'+teamCode()+'/'+path+'.json');
+  x.open(method,FB_URL+'e/'+teamCode()+(path?'/'+path:'')+'.json');
   x.setRequestHeader('Content-Type','application/json');
   x.onload=function(){cb(x.status>=200&&x.status<300?null:x.status,x.responseText)};
   x.onerror=function(){cb('net')};
@@ -633,8 +647,11 @@ function fbReq(method,path,body,cb){
 }
 function pollLive(){
   if(!FB_URL||!teamCode())return;
-  fbReq('GET','statuts',null,function(err,t){
-    if(!err){try{S.live=JSON.parse(t)||{};S.liveErr=null}catch(e){}}else S.liveErr=err;
+  fbReq('GET','',null,function(err,t){
+    if(!err&&t===S.lastTree&&view()!=='affichage')return;
+    if(!err)S.lastTree=t;
+    if(!err){try{var all=JSON.parse(t)||{};S.live=all.statuts||{};S.today=all.aujourdhui||null;S.liveErr=null;
+      if(all.config&&all.config.team){S.fbCfg=normalize(all.config);S.cfg=S.fbCfg;S.state='ok';}}catch(e){}}else S.liveErr=err;
     var ae=document.activeElement;if(!(ae&&/INPUT|SELECT/.test(ae.tagName)))refreshView();
   });
 }
