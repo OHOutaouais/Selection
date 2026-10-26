@@ -8,7 +8,7 @@
 <title>Horaire Sélection</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Creepster&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <style>
 /* Layout: tableau de signalisation — un gros voyant « qui aller voir », l'équipe en trois tuiles, la semaine en bas. Config sur un 2e onglet. */
 :root{
@@ -162,13 +162,40 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
   .nav{grid-column:1 / -1;justify-self:start}
   .clock{font-size:1.6rem}
 }
-@media (prefers-reduced-motion:reduce){.sig.go::after{animation:none;opacity:.6}}
+ /* ---------- thème Halloween ---------- */
+html.theme-halloween{
+  --bg:#130a1b; --panel:#1e1029; --panel-2:#2a1638; --line:#3e2452;
+  --fg:#f7ead6; --muted:#b9a0c9; --accent:#ff8a1f;
+  --go:#5cf03a; --go-ink:#0d2603; --go-soft:rgba(92,240,58,.16); --go-line:rgba(92,240,58,.7);
+  --stop:#ff4d3d; --stop-ink:#2b0603; --off:#5d4a6b;
+}
+html.theme-halloween body{background:var(--bg);background-image:radial-gradient(ellipse at 85% -10%,rgba(255,138,31,.22),transparent 55%),radial-gradient(ellipse at 0% 110%,rgba(140,60,200,.25),transparent 60%);background-attachment:fixed}
+html.theme-halloween .brand{font-family:"Creepster","Barlow Condensed",Impact,sans-serif;color:var(--accent);font-weight:400;letter-spacing:.06em;font-size:1.7rem}
+html.theme-halloween .brand::before{content:"🎃 "}
+html.theme-halloween .brand small{color:var(--muted);font-family:var(--f-body);letter-spacing:.04em}
+html.theme-halloween .ctx h2{color:var(--accent)}
+html.theme-halloween .sig.go .lbl::after{content:" 🎃"}
+html.theme-halloween .sig.go{box-shadow:0 0 0 6px rgba(92,240,58,.2),0 0 70px rgba(92,240,58,.5)}
+html.theme-halloween .nav a[aria-current="page"]{background:var(--accent);color:#2a1300}
+html.theme-halloween .btn.primary{background:var(--accent);border-color:var(--accent);color:#2a1300}
+#deco{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;overflow:hidden;z-index:0}
+.wrap{position:relative;z-index:1}
+#deco span{position:absolute;opacity:.55;-webkit-animation:flot 9s ease-in-out infinite;animation:flot 9s ease-in-out infinite}
+#deco .web{opacity:.35;-webkit-animation:none;animation:none}
+@-webkit-keyframes flot{0%,100%{-webkit-transform:translate(0,0) rotate(-6deg)}50%{-webkit-transform:translate(18px,-22px) rotate(6deg)}}
+@keyframes flot{0%,100%{transform:translate(0,0) rotate(-6deg)}50%{transform:translate(18px,-22px) rotate(6deg)}}
+.themes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));grid-gap:10px}
+.themes .btn{padding:14px;font-size:1.05rem;font-weight:700}
+.themes .btn.cur{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+
+@media (prefers-reduced-motion:reduce){#deco span{-webkit-animation:none;animation:none}.sig.go::after{animation:none;opacity:.6}}
 </style>
 </head>
 <body>
 <script type="application/json" id="seed">{"team": ["Janet", "Catherine", "Andréa"], "hours": {"start": "09:00", "noon": "12:00", "pmStart": "13:00", "end": "15:30"}, "phones": {"lun": {"am": "Janet", "pm": "Andréa"}, "mar": {"am": "Catherine", "pm": "Janet"}, "mer": {"am": "Janet", "pm": "Andréa"}, "jeu": {"am": "Catherine", "pm": "Janet"}, "ven": {"am": "Andréa", "pm": ""}}, "accueil": {"lun": {"am": ["Catherine", "Janet"], "pm": ["Catherine", "Andréa"]}, "mar": {"am": ["Janet", "Andréa"], "pm": ["Andréa", "Janet"]}, "mer": {"am": ["Andréa", "Catherine"], "pm": ["Janet", "Andréa"]}, "jeu": {"am": ["Janet", "Andréa"], "pm": ["Andréa", "Janet"]}, "ven": {"am": ["Catherine", "Janet"], "pm": ["", ""]}}, "absences": [], "status": {}, "notice": "", "updatedAt": "2026-10-26T12:50:00.000Z"}</script>
 
 
+<div id="deco" aria-hidden="true"></div>
 <div class="wrap">
   <header class="bar">
     <div class="brand">Équipe Sélection<small>Qui aller voir pour un client à l'accueil</small></div>
@@ -223,6 +250,7 @@ function normalize(d){
   c.absences=Array.isArray(c.absences)?c.absences:[];
   c.status=c.status||{};
   c.notice=c.notice||'';
+  c.theme=c.theme==='halloween'?'halloween':'normal';
   return c;
 }
 function fbOn(){return !!(STANDALONE&&FB_URL&&teamCode()&&S.liveErr!==401)}
@@ -430,6 +458,11 @@ function renderConfig(){
   h+='</div></section>';
   }
 
+  // thème
+  h+='<section class="card"><h2>Thème de l\'écran</h2><p class="hint">S\'applique à tous les écrans. Le vert reste toujours la personne à aller voir.</p><div class="themes">'+
+    '<button class="btn'+(cfg.theme==='halloween'?' cur':'')+'" data-act="theme" data-theme="halloween"'+dis+'>🎃 Halloween</button>'+
+    '<button class="btn'+(cfg.theme!=='halloween'?' cur':'')+'" data-act="theme" data-theme="normal"'+dis+'>Remettre normal</button></div></section>';
+
   // message
   h+='<section class="card"><h2>Message à l\'écran</h2><p class="hint">S\'affiche en haut de l\'affichage. Laisser vide pour l\'enlever.</p><div class="savebar"><input id="notice" value="'+esc(cfg.notice)+'" placeholder="Ex. : Équipe en réunion jusqu\'à 10 h"'+dis+'><button class="btn primary" data-act="notice"'+dis+'>Afficher</button></div></section>';
 
@@ -524,6 +557,9 @@ document.addEventListener('click',function(ev){
   }else if(act==='clear'){
     var n2=cfg.team[+b.getAttribute('data-n')];S.forceCfg=true;
     save(function(c){delete c.status[n2]},n2+' : selon l\'horaire.');
+  }else if(act==='theme'){
+    var th=b.getAttribute('data-theme');S.forceCfg=true;
+    save(function(c){c.theme=th},th==='halloween'?'Thème Halloween activé.':'Thème normal remis.');
   }else if(act==='notice'){
     var v=$('#notice').value.trim();S.forceCfg=true;save(function(c){c.notice=v},v?'Message affiché.':'Message retiré.');
   }else if(act==='addabs'){
@@ -689,7 +725,18 @@ function stMsg(m,err){var e=$('#st-msg');if(e){e.textContent=m;e.className='stat
 
 /* ---------- vues ---------- */
 function view(){return location.hash==='#config'?'config':(location.hash==='#statut'&&STANDALONE)?'statut':'affichage'}
-function refreshView(){var v=view();if(v==='affichage')renderDisplay();else if(v==='statut')renderStatut();else renderConfig();}
+var curTheme='';
+function applyTheme(){
+  var t=(S.cfg&&S.cfg.theme)||'normal';if(t===curTheme)return;curTheme=t;
+  var root=document.documentElement;root.className=root.className.replace(/\s*theme-\w+/g,'')+(t==='halloween'?' theme-halloween':'');
+  var d=document.getElementById('deco');if(!d)return;
+  if(t!=='halloween'){d.innerHTML='';return;}
+  var items=[['🦇',6,14,'2.4rem',0],['🦇',78,9,'1.8rem',2.5],['🦇',52,4,'1.4rem',5],['👻',91,46,'2.6rem',1.2],['👻',3,62,'2rem',4],['🎃',94,88,'3rem',3],['🕷️',38,92,'1.6rem',6],['🍬',62,70,'1.5rem',7]];
+  var h='<span class="web" style="left:-6px;top:-6px;font-size:5rem">🕸️</span><span class="web" style="right:-6px;bottom:-10px;font-size:4rem">🕸️</span>';
+  items.forEach(function(x){h+='<span style="left:'+x[1]+'%;top:'+x[2]+'%;font-size:'+x[3]+';-webkit-animation-delay:-'+x[4]+'s;animation-delay:-'+x[4]+'s">'+x[0]+'</span>';});
+  d.innerHTML=h;
+}
+function refreshView(){applyTheme();var v=view();if(v==='affichage')renderDisplay();else if(v==='statut')renderStatut();else renderConfig();}
 function render(){
   var v=view();
   $('#view-display').hidden=v!=='affichage';$('#view-config').hidden=v!=='config';$('#view-statut').hidden=v!=='statut';
