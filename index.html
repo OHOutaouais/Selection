@@ -131,6 +131,12 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
 .savebar{display:grid;grid-template-columns:1fr auto;grid-gap:10px;align-items:center;margin-top:12px}
 .status{font-size:.9rem;color:var(--muted)}
 .status.err{color:var(--stop)}
+.temp{margin-top:24px;border:1px solid var(--line);border-radius:14px;padding:14px 18px;background:var(--panel)}
+.temp h3{font-size:1.3rem;margin-bottom:4px}
+.temp p{margin:0 0 12px;color:var(--muted);font-size:.92rem}
+.tempbtns{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-gap:10px}
+.tbtn{padding:12px 14px;font-size:1.1rem;font-weight:700}
+.tbtn.on{background:var(--stop);color:var(--stop-ink);border-color:var(--stop)}
 .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));grid-gap:8px;margin-top:20px;color:var(--muted);font-size:.88rem}
 .legend span .dot{width:.9em;height:.9em}
 
@@ -204,6 +210,18 @@ function normalize(d){
   c.notice=c.notice||'';
   return c;
 }
+function tempAway(){
+  var t=ymd(new Date()),v=null;
+  try{v=JSON.parse(localStorage.getItem('horaire-temp')||'null')}catch(e){}
+  return (v&&v.date===t&&Array.isArray(v.away))?v.away:[];
+}
+function setTempAway(list){try{localStorage.setItem('horaire-temp',JSON.stringify({date:ymd(new Date()),away:list}))}catch(e){}}
+function withTemp(cfg){
+  var away=STANDALONE?tempAway():[];if(!away.length)return cfg;
+  var c=clone(cfg),t=ymd(new Date());
+  away.forEach(function(n){c.absences.push({id:'tmp-'+n,name:n,from:t,to:t,part:'jour',note:'absence temporaire'})});
+  return c;
+}
 function blankCfg(){return normalize({team:['Janet','Catherine','Andréa']})}
 
 /* ---------- logique ---------- */
@@ -252,7 +270,7 @@ function sigCard(kind,size,label,name,sub,phone){
     (phone?'<div class="phone">Peut être au téléphone</div>':'')+'</div>';
 }
 function renderDisplay(){
-  var el=$('#view-display'),cfg=S.cfg;
+  var el=$('#view-display'),cfg=S.cfg?withTemp(S.cfg):null;
   if(S.state==='loading'){el.innerHTML='<div class="empty"><h2>Chargement de l\'horaire…</h2><p>Un instant.</p></div>';return;}
   if(S.state==='nodb'||S.state==='err'){el.innerHTML='<div class="empty"><h2>Horaire inaccessible</h2><p>'+(STANDALONE?'Le fichier horaire.json est introuvable ou mal formé. Il doit être dans le même dossier que cette page.':'Cette page doit être ouverte dans Claude par une personne connectée qui a accès au lien partagé.')+'</p></div>';return;}
   if(!cfg){el.innerHTML='<div class="empty"><h2>Aucun horaire configuré</h2><p>Ouvrez l\'onglet <a href="#config" style="color:var(--accent)">Configuration</a> pour entrer l\'horaire de l\'équipe.</p></div>';return;}
@@ -307,6 +325,13 @@ function renderDisplay(){
   h+='<div class="legend"><span><span class="dot" style="color:var(--go)"></span>Vert : aller voir cette personne</span>'+
      '<span><span class="dot" style="color:var(--go);opacity:.4"></span>Vert pâle : 2e choix, si la première n\'est pas disponible</span>'+
      '</div>';
+  if(STANDALONE){
+    var away=tempAway();
+    h+='<section class="temp"><h3>Absent aujourd\'hui</h3><p>Touchez un nom pour le retirer de l\'horaire d\'aujourd\'hui. Ce changement reste <b>sur cet appareil seulement</b> et s\'efface à minuit.</p><div class="tempbtns">';
+    S.cfg.team.forEach(function(n,i){var on=away.indexOf(n)>=0;
+      h+='<button class="btn tbtn'+(on?' on':'')+'" data-act="tmp" data-n="'+i+'" aria-pressed="'+on+'">'+esc(n)+(on?' · absent':'')+'</button>';});
+    h+='</div></section>';
+  }
   el.innerHTML=h;
 }
 function timeOf(iso){var d=new Date(iso);return hfmt(pad(d.getHours())+':'+pad(d.getMinutes()))}
@@ -477,6 +502,10 @@ document.addEventListener('click',function(ev){
       }});
       c.team=D.team.filter(Boolean);c.hours=D.hours;c.phones=D.phones;c.accueil=D.accueil;
     },'Horaire enregistré.');
+  }else if(act==='tmp'){
+    var tn=S.cfg.team[+b.getAttribute('data-n')],aw=tempAway(),ix=aw.indexOf(tn);
+    if(ix>=0)aw.splice(ix,1);else aw.push(tn);
+    setTempAway(aw);renderDisplay();
   }else if(act==='copy'){
     var ta=$('#export'),txt=ta.value;
     var fb=function(){ta.focus();ta.select();try{document.execCommand('copy');flash('Copié.')}catch(e){flash('Sélectionnez le texte et copiez-le.',true)}};
