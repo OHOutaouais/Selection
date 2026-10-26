@@ -40,7 +40,7 @@ button,select,input,textarea{font:inherit;color:inherit}
 .ctx{display:grid;grid-template-columns:1fr auto;align-items:end;grid-gap:12px;margin-bottom:14px}
 .ctx h2{font-size:clamp(1.6rem,4vw,2.4rem)}
 .pill{display:inline-block;font-size:.8rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
-.pill.live{color:var(--go);border-color:color-mix(in srgb,var(--go) 45%,transparent)}
+.pill.live{color:var(--go);border-color:rgba(47,224,122,.45)}
 .notice{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:1.05rem}
 
 /* voyants principaux */
@@ -52,7 +52,7 @@ button,select,input,textarea{font:inherit;color:inherit}
 .sig .sub{margin-top:8px;font-size:1rem;opacity:.85}
 .sig.big .name{font-size:clamp(3.5rem,11vw,8.5rem)}
 .sig.small .name{font-size:clamp(2.4rem,6vw,4.2rem)}
-.sig.go{background:var(--go);color:var(--go-ink);border-color:var(--go);box-shadow:0 0 0 6px color-mix(in srgb,var(--go) 18%,transparent),0 0 60px color-mix(in srgb,var(--go) 45%,transparent)}
+.sig.go{background:var(--go);color:var(--go-ink);border-color:var(--go);box-shadow:0 0 0 6px rgba(47,224,122,.18),0 0 60px rgba(47,224,122,.45)}
 .sig.wait{background:var(--go-soft);color:var(--fg);border-color:var(--go-line)}
 .sig.wait .lbl{color:var(--go)}
 .sig .phone{display:inline-block;margin-top:10px;font-size:.95rem;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.28);color:inherit}
@@ -92,7 +92,7 @@ th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;verti
 thead th{font-family:var(--f-display);font-weight:600;font-size:1.05rem;letter-spacing:.03em;background:var(--panel)}
 tbody th{color:var(--muted);font-weight:400;white-space:nowrap;font-size:.85rem}
 tr:last-child th,tr:last-child td{border-bottom:0}
-td.today{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+td.today{background:rgba(127,209,195,.09)}
 td.cur{box-shadow:inset 0 0 0 2px var(--accent)}
 .s2{color:var(--muted);font-size:.85rem}
 .abs{text-decoration:line-through;opacity:.55}
