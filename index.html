@@ -135,6 +135,7 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
 .temp h3{font-size:1.3rem;margin-bottom:4px}
 .temp p{margin:0 0 12px;color:var(--muted);font-size:.92rem}
 .tempbtns{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-gap:10px}
+.tcell{display:grid;grid-gap:6px;align-content:start}
 .tbtn{padding:12px 14px;font-size:1.1rem;font-weight:700}
 .tbtn.on{background:var(--stop);color:var(--stop-ink);border-color:var(--stop)}
 .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));grid-gap:8px;margin-top:20px;color:var(--muted);font-size:.88rem}
@@ -210,16 +211,18 @@ function normalize(d){
   c.notice=c.notice||'';
   return c;
 }
-function tempAway(){
+function tempState(){
   var t=ymd(new Date()),v=null;
   try{v=JSON.parse(localStorage.getItem('horaire-temp')||'null')}catch(e){}
-  return (v&&v.date===t&&Array.isArray(v.away))?v.away:[];
+  if(!v||v.date!==t||!Array.isArray(v.away))return {date:t,away:[],subs:{}};
+  v.subs=v.subs||{};return v;
 }
-function setTempAway(list){try{localStorage.setItem('horaire-temp',JSON.stringify({date:ymd(new Date()),away:list}))}catch(e){}}
+function tempAway(){return tempState().away}
+function saveTemp(v){v.date=ymd(new Date());try{localStorage.setItem('horaire-temp',JSON.stringify(v))}catch(e){}}
 function withTemp(cfg){
-  var away=STANDALONE?tempAway():[];if(!away.length)return cfg;
+  var ts=STANDALONE?tempState():{away:[],subs:{}};if(!ts.away.length)return cfg;
   var c=clone(cfg),t=ymd(new Date());
-  away.forEach(function(n){c.absences.push({id:'tmp-'+n,name:n,from:t,to:t,part:'jour',note:'absence temporaire'})});
+  ts.away.forEach(function(n){c.absences.unshift({id:'tmp-'+n,name:n,from:t,to:t,part:'jour',note:'',sub:ts.subs[n]||''})});
   return c;
 }
 function blankCfg(){return normalize({team:['Janet','Catherine','Andréa']})}
@@ -252,11 +255,14 @@ function resolve(cfg,date,p,now,live){
   var k=dayKey(date),r={phone:'',acc:[],avail:[],skipped:[],people:{}};
   if(!k)return r;
   r.phone=cfg.phones[k][p]||'';
+  var pa=r.phone?absenceFor(cfg,r.phone,date,p):null;
+  if(pa&&pa.sub){r.phoneFor=r.phone;r.phone=pa.sub;}
   r.acc=cfg.accueil[k][p].filter(Boolean);
   cfg.team.forEach(function(n){r.people[n]={abs:absenceFor(cfg,n,date,p),dnd:live?dndFor(cfg,n,now):null};});
   r.acc.forEach(function(n,i){
     var st=r.people[n]||{};
-    if(st.abs)r.skipped.push({name:n,rank:i,why:'en congé'});
+    if(st.abs&&st.abs.sub)r.avail.push({name:st.abs.sub,rank:i,sub:n});
+    else if(st.abs)r.skipped.push({name:n,rank:i,why:'en congé'});
     else if(st.dnd)r.skipped.push({name:n,rank:i,why:'ne pas déranger'});
     else r.avail.push({name:n,rank:i});
   });
@@ -283,14 +289,14 @@ function renderDisplay(){
 
   var a0=r.avail[0],a1=r.avail[1],main,side='';
   if(a0){
-    var sub=a0.rank===0?'1er choix':'Remplace '+r.skipped[0].name+' ('+r.skipped[0].why+')';
+    var sub=a0.sub?'Remplace '+a0.sub+(a0.rank===0?' · 1er choix':''):a0.rank===0?'1er choix':'Remplace '+r.skipped[0].name+' ('+r.skipped[0].why+')';
     main=sigCard('go','big','Aller voir',a0.name,sub,r.phone===a0.name);
   }else if(r.acc.length){
     main=sigCard('stop','big','Personne de disponible','Aucune',r.skipped.map(function(s){return s.name+' : '+s.why}).join(' · '));
   }else{
     main=sigCard('none','big','Accueil','Personne de prévu','Aucune personne de la Sélection à l\'horaire pour ce quart.');
   }
-  if(a1)side+=sigCard('wait','small','Si non disponible',a1.name,'2e choix',r.phone===a1.name);
+  if(a1)side+=sigCard('wait','small','Si non disponible',a1.name,'2e choix'+(a1.sub?' · remplace '+a1.sub:''),r.phone===a1.name);
   else if(a0)side+=sigCard('none','small','2e choix','—',r.skipped.length&&a0.rank===0?r.skipped[0].name+' : '+r.skipped[0].why:'Pas de 2e choix pour ce quart');
   // autre demi-journée
   var nxt=null;
@@ -327,9 +333,11 @@ function renderDisplay(){
      '</div>';
   if(STANDALONE){
     var away=tempAway();
-    h+='<section class="temp"><h3>Absent aujourd\'hui</h3><p>Touchez un nom pour le retirer de l\'horaire d\'aujourd\'hui. Ce changement reste <b>sur cet appareil seulement</b> et s\'efface à minuit.</p><div class="tempbtns">';
+    h+='<section class="temp"><h3>Absent aujourd\'hui</h3><p>Touchez un nom pour le retirer de l\'horaire d\'aujourd\'hui, et inscrivez au besoin qui le remplace. Ce changement reste <b>sur cet appareil seulement</b> et s\'efface à minuit.</p><div class="tempbtns">';
+    var subs=tempState().subs;
     S.cfg.team.forEach(function(n,i){var on=away.indexOf(n)>=0;
-      h+='<button class="btn tbtn'+(on?' on':'')+'" data-act="tmp" data-n="'+i+'" aria-pressed="'+on+'">'+esc(n)+(on?' · absent':'')+'</button>';});
+      h+='<div class="tcell"><button class="btn tbtn'+(on?' on':'')+'" data-act="tmp" data-n="'+i+'" aria-pressed="'+on+'">'+esc(n)+(on?' · absent':'')+'</button>'+
+        (on?'<input id="tsub-'+i+'" data-tsub="'+i+'" value="'+esc(subs[n]||'')+'" placeholder="Remplacé par (facultatif)" aria-label="Remplaçant de '+esc(n)+'">':'')+'</div>';});
     h+='</div></section>';
   }
   el.innerHTML=h;
@@ -340,7 +348,7 @@ function weekTable(cfg,sl,now){
   var mon=new Date(base);mon.setDate(base.getDate()-((base.getDay()+6)%7));
   var dates=DAYS.map(function(_,i){var d=new Date(mon);d.setDate(mon.getDate()+i);return d;});
   var today=ymd(now),cur=ymd(sl.date);
-  function nm(n,d,p){if(!n)return '—';return absenceFor(cfg,n,d,p)?'<span class="abs">'+esc(n)+'</span>':esc(n)}
+  function nm(n,d,p){if(!n)return '—';var a=absenceFor(cfg,n,d,p);if(!a)return esc(n);return '<span class="abs">'+esc(n)+'</span>'+(a.sub?' '+esc(a.sub):'')}
   var h='<section class="week"><h3>Semaine du '+mon.getDate()+' '+MO[mon.getMonth()]+'</h3><div class="scroll"><table><thead><tr><th></th>';
   dates.forEach(function(d,i){h+='<th>'+DAYS[i].l+' '+d.getDate()+'</th>'});
   h+='</tr></thead><tbody>';
@@ -407,6 +415,7 @@ function renderConfig(){
     '<label class="f">Du<input type="date" id="ab-from" value="'+today+'"'+dis+'></label>'+
     '<label class="f">Au (inclus)<input type="date" id="ab-to" value="'+today+'"'+dis+'></label>'+
     '<label class="f">Période<select id="ab-part"'+dis+'><option value="jour">Journée complète</option><option value="am">Avant-midi</option><option value="pm">Après-midi</option></select></label>'+
+    '<label class="f">Remplacé par<input id="ab-sub" placeholder="Facultatif"'+dis+'></label>'+
     '<label class="f">Note<input id="ab-note" placeholder="Ex. : Vacances"'+dis+'></label>'+
     '<button class="btn primary" data-act="addabs"'+dis+'>Ajouter</button></div><div class="list">';
   if(!list.length)h+='<div class="item"><span class="meta">Aucune absence prévue.</span></div>';
@@ -415,7 +424,7 @@ function renderConfig(){
     var range=a.from===(a.to||a.from)?dlong(f):'Du '+dlong(f)+' au '+dlong(t);
     var part=a.part==='am'?' · avant-midi':a.part==='pm'?' · après-midi':'';
     var armed=S.armed===a.id;
-    h+='<div class="item"><div><b>'+esc(a.name)+'</b> <span class="meta">'+esc(range+part)+(a.note?' · '+esc(a.note):'')+'</span></div>'+
+    h+='<div class="item"><div><b>'+esc(a.name)+'</b> <span class="meta">'+esc(range+part)+(a.sub?' · remplacé par '+esc(a.sub):'')+(a.note?' · '+esc(a.note):'')+'</span></div>'+
       '<button class="btn danger'+(armed?' armed':'')+'" data-act="delabs" data-id="'+esc(a.id)+'"'+dis+'>'+(armed?'Confirmer':'Retirer')+'</button></div>';
   });
   h+='</div></section>';
@@ -483,7 +492,7 @@ document.addEventListener('click',function(ev){
   }else if(act==='notice'){
     var v=$('#notice').value.trim();S.forceCfg=true;save(function(c){c.notice=v},v?'Message affiché.':'Message retiré.');
   }else if(act==='addabs'){
-    var a={id:uid(),name:$('#ab-name').value,from:$('#ab-from').value,to:$('#ab-to').value||$('#ab-from').value,part:$('#ab-part').value,note:$('#ab-note').value.trim()};
+    var a={id:uid(),name:$('#ab-name').value,from:$('#ab-from').value,to:$('#ab-to').value||$('#ab-from').value,part:$('#ab-part').value,sub:$('#ab-sub').value.trim(),note:$('#ab-note').value.trim()};
     if(!a.name){flash('Choisissez la personne absente.',true);return;}
     if(!a.from){flash('Indiquez la date de début.',true);return;}
     if(a.to<a.from){flash('La date de fin est avant la date de début.',true);return;}
@@ -503,9 +512,10 @@ document.addEventListener('click',function(ev){
       c.team=D.team.filter(Boolean);c.hours=D.hours;c.phones=D.phones;c.accueil=D.accueil;
     },'Horaire enregistré.');
   }else if(act==='tmp'){
-    var tn=S.cfg.team[+b.getAttribute('data-n')],aw=tempAway(),ix=aw.indexOf(tn);
-    if(ix>=0)aw.splice(ix,1);else aw.push(tn);
-    setTempAway(aw);renderDisplay();
+    var tn=S.cfg.team[+b.getAttribute('data-n')],ts=tempState(),ix=ts.away.indexOf(tn);
+    if(ix>=0){ts.away.splice(ix,1);delete ts.subs[tn];}else ts.away.push(tn);
+    saveTemp(ts);renderDisplay();
+    if(ix<0){var inp=$('#tsub-'+b.getAttribute('data-n'));if(inp)inp.focus();}
   }else if(act==='copy'){
     var ta=$('#export'),txt=ta.value;
     var fb=function(){ta.focus();ta.select();try{document.execCommand('copy');flash('Copié.')}catch(e){flash('Sélectionnez le texte et copiez-le.',true)}};
@@ -515,7 +525,10 @@ document.addEventListener('click',function(ev){
   }else if(act==='cancel'){S.dirty=false;S.draft=null;S.forceCfg=true;renderConfig();}
 });
 document.addEventListener('change',function(ev){
-  var t=ev.target,D=S.draft;if(!D)return;
+  var t=ev.target;
+  if(t.hasAttribute&&t.hasAttribute('data-tsub')){var ts=tempState(),nn=S.cfg.team[+t.getAttribute('data-tsub')],v=t.value.trim();
+    if(v)ts.subs[nn]=v;else delete ts.subs[nn];saveTemp(ts);renderDisplay();return;}
+  var D=S.draft;if(!D)return;
   if(t.hasAttribute('data-team')){
     var i=+t.getAttribute('data-team'),old=D.team[i],nw=t.value.trim();if(!nw||old===nw)return;
     D.team[i]=nw;
@@ -575,7 +588,7 @@ function tick(){var d=new Date();$('#clock').textContent=d.getHours()+' h '+pad(
 window.addEventListener('hashchange',function(){S.forceCfg=true;render()});
 tick();render();
 setInterval(tick,5000);
-setInterval(function(){if(view()==='affichage')renderDisplay();},30000);
+setInterval(function(){var ae=document.activeElement;if(view()==='affichage'&&!(ae&&ae.tagName==='INPUT'))renderDisplay();},30000);
 
 // garder l'écran allumé quand c'est permis
 var lock=null;
