@@ -337,7 +337,7 @@ function renderDisplay(){
     var subs=tempState().subs;
     S.cfg.team.forEach(function(n,i){var on=away.indexOf(n)>=0;
       h+='<div class="tcell"><button class="btn tbtn'+(on?' on':'')+'" data-act="tmp" data-n="'+i+'" aria-pressed="'+on+'">'+esc(n)+(on?' · absent':'')+'</button>'+
-        (on?'<input id="tsub-'+i+'" data-tsub="'+i+'" value="'+esc(subs[n]||'')+'" placeholder="Remplacé par (facultatif)" aria-label="Remplaçant de '+esc(n)+'">':'')+'</div>';});
+        (on?'<select id="tsub-'+i+'" data-tsub="'+i+'" aria-label="Remplaçant de '+esc(n)+'">'+opts(S.cfg.team.filter(function(x){return x!==n}),subs[n]||'','Remplacé par… (personne)')+'</select>':'')+'</div>';});
     h+='</div></section>';
   }
   el.innerHTML=h;
@@ -415,7 +415,7 @@ function renderConfig(){
     '<label class="f">Du<input type="date" id="ab-from" value="'+today+'"'+dis+'></label>'+
     '<label class="f">Au (inclus)<input type="date" id="ab-to" value="'+today+'"'+dis+'></label>'+
     '<label class="f">Période<select id="ab-part"'+dis+'><option value="jour">Journée complète</option><option value="am">Avant-midi</option><option value="pm">Après-midi</option></select></label>'+
-    '<label class="f">Remplacé par<input id="ab-sub" placeholder="Facultatif"'+dis+'></label>'+
+    '<label class="f">Remplacé par<select id="ab-sub"'+dis+'>'+opts(cfg.team,'','Personne')+'</select></label>'+
     '<label class="f">Note<input id="ab-note" placeholder="Ex. : Vacances"'+dis+'></label>'+
     '<button class="btn primary" data-act="addabs"'+dis+'>Ajouter</button></div><div class="list">';
   if(!list.length)h+='<div class="item"><span class="meta">Aucune absence prévue.</span></div>';
@@ -515,7 +515,6 @@ document.addEventListener('click',function(ev){
     var tn=S.cfg.team[+b.getAttribute('data-n')],ts=tempState(),ix=ts.away.indexOf(tn);
     if(ix>=0){ts.away.splice(ix,1);delete ts.subs[tn];}else ts.away.push(tn);
     saveTemp(ts);renderDisplay();
-    if(ix<0){var inp=$('#tsub-'+b.getAttribute('data-n'));if(inp)inp.focus();}
   }else if(act==='copy'){
     var ta=$('#export'),txt=ta.value;
     var fb=function(){ta.focus();ta.select();try{document.execCommand('copy');flash('Copié.')}catch(e){flash('Sélectionnez le texte et copiez-le.',true)}};
@@ -588,7 +587,7 @@ function tick(){var d=new Date();$('#clock').textContent=d.getHours()+' h '+pad(
 window.addEventListener('hashchange',function(){S.forceCfg=true;render()});
 tick();render();
 setInterval(tick,5000);
-setInterval(function(){var ae=document.activeElement;if(view()==='affichage'&&!(ae&&ae.tagName==='INPUT'))renderDisplay();},30000);
+setInterval(function(){var ae=document.activeElement;if(view()==='affichage'&&!(ae&&/INPUT|SELECT/.test(ae.tagName)))renderDisplay();},30000);
 
 // garder l'écran allumé quand c'est permis
 var lock=null;
