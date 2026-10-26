@@ -8,7 +8,7 @@
 <title>Horaire Sélection</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Creepster&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Creepster&family=Mountains+of+Christmas:wght@700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <style>
 /* Layout: tableau de signalisation — un gros voyant « qui aller voir », l'équipe en trois tuiles, la semaine en bas. Config sur un 2e onglet. */
 :root{
@@ -184,11 +184,31 @@ html.theme-halloween .btn.primary{background:var(--accent);border-color:var(--ac
 #deco .web{opacity:.35;-webkit-animation:none;animation:none}
 @-webkit-keyframes flot{0%,100%{-webkit-transform:translate(0,0) rotate(-6deg)}50%{-webkit-transform:translate(18px,-22px) rotate(6deg)}}
 @keyframes flot{0%,100%{transform:translate(0,0) rotate(-6deg)}50%{transform:translate(18px,-22px) rotate(6deg)}}
+ /* ---------- thème Noël ---------- */
+html.theme-noel{
+  --bg:#0b1424; --panel:#121e33; --panel-2:#1a2942; --line:#2a3d5c;
+  --fg:#f4f1ea; --muted:#a9b6cc; --accent:#f2c14e;
+  --go:#3fe07f; --go-ink:#04230f; --go-soft:rgba(63,224,127,.16); --go-line:rgba(63,224,127,.7);
+  --stop:#ff4d4d; --stop-ink:#2b0505; --off:#4d5a70;
+}
+html.theme-noel body{background:var(--bg);background-image:radial-gradient(ellipse at 50% -20%,rgba(242,193,78,.18),transparent 55%),radial-gradient(ellipse at 100% 110%,rgba(200,40,50,.22),transparent 55%);background-attachment:fixed}
+html.theme-noel .brand{font-family:"Mountains of Christmas","Barlow Condensed",Georgia,serif;color:var(--accent);font-weight:700;letter-spacing:.03em;text-transform:none;font-size:1.9rem}
+html.theme-noel .brand::before{content:"🎄 "}
+html.theme-noel .brand small{color:var(--muted);font-family:var(--f-body);letter-spacing:.04em}
+html.theme-noel .ctx h2{color:var(--accent)}
+html.theme-noel .sig.go .lbl::after{content:" 🎁"}
+html.theme-noel .sig.go{box-shadow:0 0 0 6px rgba(63,224,127,.2),0 0 70px rgba(242,193,78,.35)}
+html.theme-noel .nav a[aria-current="page"]{background:#c8283a;color:#fff}
+html.theme-noel .btn.primary{background:#c8283a;border-color:#c8283a;color:#fff}
+html.theme-noel .bar{border-bottom:3px solid transparent;border-image:repeating-linear-gradient(90deg,#c8283a 0 14px,#f4f1ea 14px 28px) 3}
+#deco .snow{top:-8%;opacity:.8;color:#fff;-webkit-animation:fall linear infinite;animation:fall linear infinite}
+@-webkit-keyframes fall{0%{-webkit-transform:translate(0,0)}50%{-webkit-transform:translate(30px,55vh)}100%{-webkit-transform:translate(-10px,115vh)}}
+@keyframes fall{0%{transform:translate(0,0)}50%{transform:translate(30px,55vh)}100%{transform:translate(-10px,115vh)}}
 .themes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));grid-gap:10px}
 .themes .btn{padding:14px;font-size:1.05rem;font-weight:700}
 .themes .btn.cur{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
 
-@media (prefers-reduced-motion:reduce){#deco span{-webkit-animation:none;animation:none}.sig.go::after{animation:none;opacity:.6}}
+@media (prefers-reduced-motion:reduce){#deco .snow{display:none}#deco span{-webkit-animation:none;animation:none}.sig.go::after{animation:none;opacity:.6}}
 </style>
 </head>
 <body>
@@ -250,7 +270,7 @@ function normalize(d){
   c.absences=Array.isArray(c.absences)?c.absences:[];
   c.status=c.status||{};
   c.notice=c.notice||'';
-  c.theme=c.theme==='halloween'?'halloween':'normal';
+  c.theme=(c.theme==='halloween'||c.theme==='noel')?c.theme:'normal';
   return c;
 }
 function fbOn(){return !!(STANDALONE&&FB_URL&&teamCode()&&S.liveErr!==401)}
@@ -461,7 +481,8 @@ function renderConfig(){
   // thème
   h+='<section class="card"><h2>Thème de l\'écran</h2><p class="hint">S\'applique à tous les écrans. Le vert reste toujours la personne à aller voir.</p><div class="themes">'+
     '<button class="btn'+(cfg.theme==='halloween'?' cur':'')+'" data-act="theme" data-theme="halloween"'+dis+'>🎃 Halloween</button>'+
-    '<button class="btn'+(cfg.theme!=='halloween'?' cur':'')+'" data-act="theme" data-theme="normal"'+dis+'>Remettre normal</button></div></section>';
+    '<button class="btn'+(cfg.theme==='noel'?' cur':'')+'" data-act="theme" data-theme="noel"'+dis+'>🎄 Noël</button>'+
+    '<button class="btn'+(cfg.theme==='normal'?' cur':'')+'" data-act="theme" data-theme="normal"'+dis+'>Remettre normal</button></div></section>';
 
   // message
   h+='<section class="card"><h2>Message à l\'écran</h2><p class="hint">S\'affiche en haut de l\'affichage. Laisser vide pour l\'enlever.</p><div class="savebar"><input id="notice" value="'+esc(cfg.notice)+'" placeholder="Ex. : Équipe en réunion jusqu\'à 10 h"'+dis+'><button class="btn primary" data-act="notice"'+dis+'>Afficher</button></div></section>';
@@ -559,7 +580,7 @@ document.addEventListener('click',function(ev){
     save(function(c){delete c.status[n2]},n2+' : selon l\'horaire.');
   }else if(act==='theme'){
     var th=b.getAttribute('data-theme');S.forceCfg=true;
-    save(function(c){c.theme=th},th==='halloween'?'Thème Halloween activé.':'Thème normal remis.');
+    save(function(c){c.theme=th},th==='halloween'?'Thème Halloween activé.':th==='noel'?'Thème Noël activé.':'Thème normal remis.');
   }else if(act==='notice'){
     var v=$('#notice').value.trim();S.forceCfg=true;save(function(c){c.notice=v},v?'Message affiché.':'Message retiré.');
   }else if(act==='addabs'){
@@ -728,8 +749,14 @@ function view(){return location.hash==='#config'?'config':(location.hash==='#sta
 var curTheme='';
 function applyTheme(){
   var t=(S.cfg&&S.cfg.theme)||'normal';if(t===curTheme)return;curTheme=t;
-  var root=document.documentElement;root.className=root.className.replace(/\s*theme-\w+/g,'')+(t==='halloween'?' theme-halloween':'');
+  var root=document.documentElement;root.className=root.className.replace(/\s*theme-\w+/g,'')+(t!=='normal'?' theme-'+t:'');
   var d=document.getElementById('deco');if(!d)return;
+  if(t==='noel'){
+    var n='<span style="right:2%;bottom:1%;font-size:3.4rem;opacity:.7;-webkit-animation:none;animation:none">🎄</span><span style="left:1%;bottom:2%;font-size:2.4rem;opacity:.6;-webkit-animation:none;animation:none">⛄</span>';
+    for(var i=0;i<22;i++){var l=(i*47)%100,sz=(0.8+(i%4)*0.35).toFixed(2),du=(9+(i*7)%10),dl=((i*13)%17);
+      n+='<span class="snow" style="left:'+l+'%;font-size:'+sz+'rem;-webkit-animation-duration:'+du+'s;animation-duration:'+du+'s;-webkit-animation-delay:-'+dl+'s;animation-delay:-'+dl+'s">❄</span>';}
+    d.innerHTML=n;return;
+  }
   if(t!=='halloween'){d.innerHTML='';return;}
   var items=[['🦇',6,14,'2.4rem',0],['🦇',78,9,'1.8rem',2.5],['🦇',52,4,'1.4rem',5],['👻',91,46,'2.6rem',1.2],['👻',3,62,'2rem',4],['🎃',94,88,'3rem',3],['🕷️',38,92,'1.6rem',6],['🍬',62,70,'1.5rem',7]];
   var h='<span class="web" style="left:-6px;top:-6px;font-size:5rem">🕸️</span><span class="web" style="right:-6px;bottom:-10px;font-size:4rem">🕸️</span>';
